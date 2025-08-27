@@ -5,7 +5,8 @@
   "description": "ウェブサイト上の日付情報を検出し、Googleカレンダーに簡単に追加できるようにする拡張機能です。",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "background": {
     "service_worker": "background/service-worker.js"
