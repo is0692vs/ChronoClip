@@ -8,7 +8,7 @@
 
 (function() {
   // --- 依存関係のチェック ---
-  if (typeof ChronoClip === 'undefined' || !ChronoClip.DATE_PATTERN || !ChronoClip.isValidDate) {
+  if (typeof ChronoClip === 'undefined' || !ChronoClip.DATE_PATTERN || !ChronoClip.isValidDate || typeof chrono === 'undefined') {
     console.error("ChronoClip: 依存関係が正しく読み込まれていません。");
     return;
   }
@@ -28,6 +28,49 @@
   // --- 日付検出器の定義 ---
 
   const detectors = [
+    {
+      name: "日本語の相対日付 (JA Relative)",
+      pattern: /(今日|明日|昨日|来週|先週|今月末|来月|先月)/gi,
+      handler: (match) => {
+          const text = match[0];
+          const refDate = new Date();
+          refDate.setHours(0, 0, 0, 0);
+          let startDate = new Date(refDate);
+
+          switch (text) {
+              case '今日':
+                  break;
+              case '明日':
+                  startDate.setDate(startDate.getDate() + 1);
+                  break;
+              case '昨日':
+                  startDate.setDate(startDate.getDate() - 1);
+                  break;
+              case '来週':
+                  startDate.setDate(startDate.getDate() + 7);
+                  break;
+              case '先週':
+                  startDate.setDate(startDate.getDate() - 7);
+                  break;
+              case '今月末':
+                  startDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+                  break;
+              case '来月':
+                  startDate.setMonth(startDate.getMonth() + 1, 1);
+                  break;
+              case '先月':
+                  startDate.setMonth(startDate.getMonth() - 1, 1);
+                  break;
+          }
+          
+          const year = startDate.getFullYear();
+          const month = startDate.getMonth() + 1;
+          const day = startDate.getDate();
+
+          const normalizedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          return { normalizedDate, original: match[0] };
+      }
+    },
     {
       name: "YYYY-MM-DD or YYYY/MM/DD",
       pattern: DATE_PATTERN,
@@ -91,8 +134,23 @@
     }
 
     let allMatches = [];
+    const now = new Date();
 
-    // 1. すべての検出器からすべての一致候補を収集
+    // 1. chrono-nodeによる主要な解析
+    const chronoResults = chrono.parse(text, now);
+    chronoResults.forEach(result => {
+      const date = result.start.date();
+      const normalizedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      allMatches.push({
+        date: normalizedDate,
+        original: result.text,
+        index: result.index,
+        detector: 'chrono-node',
+        endIndex: result.index + result.text.length
+      });
+    });
+
+    // 2. カスタム正規表現検出器によるフォールバック解析
     detectors.forEach(detector => {
       let match;
       detector.pattern.lastIndex = 0;
@@ -110,15 +168,13 @@
       }
     });
 
-    // 2. 重複を解決し、最終的な日付リストを作成
-    // 開始インデックスでソート
+    // 3. 重複を解決し、最終的な日付リストを作成
     allMatches.sort((a, b) => a.index - b.index);
 
     const finalDates = [];
     let lastEndIndex = -1;
 
     allMatches.forEach(match => {
-      // 現在の一致が、最後に追加された日付の範囲内に開始している場合、それは重複とみなす
       if (match.index >= lastEndIndex) {
         finalDates.push(match);
         lastEndIndex = match.endIndex;
@@ -137,7 +193,7 @@
       }, (response) => {
         if (chrome.runtime.lastError) {
           console.error("ChronoClip: Error sending dates to background script.", chrome.runtime.lastError);
-        } else {
+        } else if (response) {
           console.log("ChronoClip: Background script acknowledged receipt of dates.", response);
         }
       });
