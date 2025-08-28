@@ -1084,8 +1084,31 @@ const ignoreSelectors = [
  * サービスワーカーからのメッセージをリッスンします。
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "show_toast") {
-    showToast(message.payload.type, message.payload.message);
+  console.log("ChronoClip: Content script received message:", message);
+
+  switch (message.type) {
+    case "show_toast":
+      showToast(message.payload.type, message.payload.message);
+      break;
+
+    case "show_quick_add_popup":
+      // Issue #11: 選択範囲モードからのポップアップ表示
+      if (message.payload && message.payload.extractedData) {
+        const data = message.payload.extractedData;
+        console.log("ChronoClip: Showing popup for extracted data:", data);
+
+        // 抽出されたデータを使ってポップアップを表示
+        showQuickAddPopupWithData(data);
+      }
+      break;
+
+    case "extract_selection":
+      // このメッセージはselection.jsで処理される - content-scriptでは何もしない
+      break;
+
+    default:
+      console.warn("ChronoClip: Unknown message type:", message.type);
+      break;
   }
 });
 
@@ -1116,4 +1139,176 @@ function showToast(type, message) {
       toast.remove();
     });
   }, 3000);
+}
+
+/**
+ * Issue #11: 選択範囲から抽出されたデータを使ってポップアップを表示
+ * @param {object} extractedData - 抽出されたデータ
+ */
+function showQuickAddPopupWithData(extractedData) {
+  console.log(
+    "ChronoClip: Showing quick add popup with extracted data:",
+    extractedData
+  );
+
+  try {
+    // 既存のポップアップが表示されている場合は削除
+    const existingPopup = document.querySelector(".chronoclip-quick-add-popup");
+    if (existingPopup) {
+      console.log("ChronoClip: Removing existing popup");
+      existingPopup.remove();
+    }
+
+    // ポップアップの位置を画面中央に設定
+    const rect = {
+      left: window.innerWidth / 2 - 200, // 幅400pxとして中央配置
+      top: window.innerHeight / 2 - 150, // 高さ300pxとして中央配置
+      width: 400,
+      height: 300,
+    };
+
+    console.log("ChronoClip: Popup position calculated:", rect);
+
+    // 抽出されたデータから日付情報を準備
+    let dateInfo = null;
+    if (extractedData.dateTime) {
+      dateInfo = extractedData.dateTime;
+      console.log("ChronoClip: Using extracted date info:", dateInfo);
+    } else {
+      // デフォルトは明日の日付
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      dateInfo = {
+        type: "date",
+        start: { date: formatDate(tomorrow) },
+        end: { date: formatDate(tomorrow) },
+      };
+      console.log("ChronoClip: Using default date info:", dateInfo);
+    }
+
+    // タイトルと詳細を準備
+    const title = extractedData.title || "イベント";
+    const description =
+      extractedData.description || extractedData.source?.selectionText || "";
+
+    console.log("ChronoClip: Prepared title and description:", {
+      title,
+      description,
+    });
+
+    // ポップアップを表示
+    console.log("ChronoClip: Calling showQuickAddPopup with:", {
+      dateInfo,
+      eventData: {
+        title: title,
+        description: description,
+        url: extractedData.url || window.location.href,
+        source: extractedData.source,
+      },
+      position: {
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      },
+    });
+
+    showQuickAddPopupForExtractedData(
+      dateInfo,
+      {
+        title: title,
+        description: description,
+        url: extractedData.url || window.location.href,
+        source: extractedData.source,
+      },
+      {
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      }
+    );
+
+    console.log("ChronoClip: Quick add popup displayed for selection data");
+  } catch (error) {
+    console.error(
+      "ChronoClip: Error showing popup with extracted data:",
+      error
+    );
+    showToast("error", "ポップアップの表示でエラーが発生しました");
+  }
+}
+
+/**
+ * 抽出されたデータ用のポップアップ表示関数
+ * @param {object} dateInfo - 日付情報
+ * @param {object} eventData - イベントデータ
+ * @param {object} position - 表示位置
+ */
+async function showQuickAddPopupForExtractedData(
+  dateInfo,
+  eventData,
+  position
+) {
+  try {
+    // 日付情報から正規化された日付と時刻を取得
+    let normalizedDate = "";
+    let time = null;
+
+    if (dateInfo && dateInfo.start) {
+      const startDate = new Date(
+        dateInfo.start.date ||
+          `${dateInfo.start.year}-${String(dateInfo.start.month).padStart(
+            2,
+            "0"
+          )}-${String(dateInfo.start.day).padStart(2, "0")}`
+      );
+      normalizedDate = formatDate(startDate);
+
+      if (
+        dateInfo.start.hour !== undefined &&
+        dateInfo.start.minute !== undefined
+      ) {
+        time = `${String(dateInfo.start.hour).padStart(2, "0")}:${String(
+          dateInfo.start.minute
+        ).padStart(2, "0")}`;
+      }
+    }
+
+    if (!normalizedDate) {
+      // フォールバック: 今日の日付を使用
+      const today = new Date();
+      normalizedDate = formatDate(today);
+    }
+
+    // 疑似イベントオブジェクトを作成
+    const mockEvent = {
+      target: document.body,
+      clientX: position.clientX || 0,
+      clientY: position.clientY || 0,
+      extractedEventData: eventData, // 抽出されたデータを含める
+    };
+
+    // 既存のshowQuickAddPopup関数を呼び出し
+    await showQuickAddPopup(normalizedDate, time, mockEvent);
+
+    console.log("ChronoClip: Quick add popup displayed for extracted data");
+  } catch (error) {
+    console.error(
+      "ChronoClip: Error in showQuickAddPopupForExtractedData:",
+      error
+    );
+    showToast("error", "ポップアップの表示でエラーが発生しました");
+  }
+}
+
+/**
+ * 日付をYYYY-MM-DD形式でフォーマット（ヘルパー関数）
+ * @param {Date} date - フォーマットする日付
+ * @returns {string} フォーマットされた日付文字列
+ */
+function formatDate(date) {
+  if (!date || isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }

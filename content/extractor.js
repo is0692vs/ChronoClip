@@ -570,9 +570,18 @@ function extractEventContext(dateElement, options = {}) {
     }
 
     // 2. 同階層の強調テキスト
-    const parent = dateElement.closest(
-      "article, section, div, li, p, .event, .schedule-item, .match, .card"
-    );
+    const parent =
+      dateElement && dateElement.closest
+        ? dateElement.closest(
+            "article, section, div, li, p, .event, .schedule-item, .match, .card"
+          )
+        : dateElement && dateElement.parentElement
+        ? dateElement.parentElement.closest
+          ? dateElement.parentElement.closest(
+              "article, section, div, li, p, .event, .schedule-item, .match, .card"
+            )
+          : dateElement.parentElement
+        : null;
     if (parent) {
       const emphasisSelectors = [
         "strong, b, em, mark",
