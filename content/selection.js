@@ -4,6 +4,125 @@
  */
 
 /**
+ * date-parser.jsの出力形式をcontent-script.jsの期待する形式に変換
+ * @param {object} parsedDate - date-parser.jsの出力
+ * @returns {object} content-script.js互換の形式
+ */
+function convertDateParserFormat(parsedDate) {
+  if (!parsedDate) return null;
+
+  const result = {
+    type: parsedDate.type,
+    confidence: parsedDate.confidence,
+    source: parsedDate.source,
+    start: {},
+    end: {},
+  };
+
+  if (parsedDate.type === "datetime") {
+    // 時刻付きイベント
+    const startDate = new Date(parsedDate.start.dateTime);
+    const endDate = new Date(parsedDate.end.dateTime);
+    
+    result.start = {
+      year: startDate.getFullYear(),
+      month: startDate.getMonth() + 1,
+      day: startDate.getDate(),
+      hour: startDate.getHours(),
+      minute: startDate.getMinutes(),
+      date: startDate.toISOString().split('T')[0],
+      dateTime: parsedDate.start.dateTime,
+      timeZone: parsedDate.start.timeZone,
+    };
+    
+    result.end = {
+      year: endDate.getFullYear(),
+      month: endDate.getMonth() + 1,
+      day: endDate.getDate(),
+      hour: endDate.getHours(),
+      minute: endDate.getMinutes(),
+      date: endDate.toISOString().split('T')[0],
+      dateTime: parsedDate.end.dateTime,
+      timeZone: parsedDate.end.timeZone,
+    };
+  } else {
+    // 終日イベント
+    const startDate = new Date(parsedDate.start.date + 'T00:00:00');
+    
+    result.start = {
+      year: startDate.getFullYear(),
+      month: startDate.getMonth() + 1,
+      day: startDate.getDate(),
+      date: parsedDate.start.date,
+    };
+    
+    result.end = {
+      year: startDate.getFullYear(),
+      month: startDate.getMonth() + 1,
+      day: startDate.getDate(),
+      date: parsedDate.end.date,
+    };
+  }
+
+  return result;
+}
+
+/**
+ * タイトルから日付関連のテキストを除去
+ * @param {string} title - 元のタイトル
+ * @param {string} dateText - 日付として使用されたテキスト
+ * @returns {string} クリーンアップされたタイトル
+ */
+function removeDateFromTitle(title, dateText) {
+  if (!title || !dateText) return title;
+
+  // 日付パターンをタイトルから除去
+  const datePatterns = [
+    // ISO形式
+    /\d{4}-\d{1,2}-\d{1,2}(?:[T\s]\d{1,2}:\d{2})?/g,
+    // 日本語形式
+    /\d{1,2}月\d{1,2}日(?:\([^)]+\))?(?:\s*\d{1,2}:\d{2}|\d{1,2}時(?:\d{2}分)?)?/g,
+    // スラッシュ形式
+    /(?:\d{4}\/)?\d{1,2}\/\d{1,2}(?:\s+\d{1,2}:\d{2})?/g,
+    // 和暦
+    /令和\d+年\d{1,2}月\d{1,2}日/g,
+    // 英語形式
+    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}(?:\s+\d{1,2}(?:pm|am)?)?/gi,
+    // 時刻のみ
+    /\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM|am|pm))?/g,
+    /\d{1,2}時(?:\d{2}分)?/g,
+    // 開場・開始等の時間表現
+    /(?:開場|開始|受付|開催)\s*\d{1,2}:\d{2}/g,
+    /(?:開場|開始|受付|開催)\s*\d{1,2}時(?:\d{2}分)?/g,
+  ];
+
+  let cleanTitle = title;
+  
+  // 各パターンで日付を除去
+  for (const pattern of datePatterns) {
+    cleanTitle = cleanTitle.replace(pattern, '');
+  }
+
+  // 余分な空白やカンマ、括弧を除去
+  cleanTitle = cleanTitle
+    .replace(/\s+/g, ' ')
+    .replace(/[,，]\s*/g, ' ')
+    .replace(/^\s*[,，(（]\s*/, '')
+    .replace(/\s*[,，)）]\s*$/, '')
+    .replace(/^\s*[-–—]\s*/, '')
+    .replace(/\s*[-–—]\s*$/, '')
+    .trim();
+
+  // 空になった場合は元のタイトルの最初の部分を使用
+  if (!cleanTitle) {
+    const words = title.split(/\s+/);
+    cleanTitle = words.slice(0, 3).join(' ') || title;
+  }
+
+  return cleanTitle;
+}
+
+/**
  * テキストを正規化する関数（extractor.jsと同じロジック）
  * @param {string} text - 正規化するテキスト
  * @returns {string} 正規化されたテキスト
@@ -211,6 +330,7 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
     // 1. 日付情報の抽出
     const dateParser = window.ChronoClipDateParser;
     let dateInfo = null;
+    let dateTextUsed = "";
 
     if (dateParser) {
       // 選択テキストと周辺コンテキストから日付を検索
@@ -222,9 +342,13 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
       ].filter((text) => text.length > 0);
 
       for (const text of textSources) {
-        dateInfo = dateParser.parseDate(text);
-        if (dateInfo) {
-          console.log("ChronoClip: Date found in text:", text, dateInfo);
+        const parsedDate = dateParser.parseDate(text);
+        if (parsedDate) {
+          console.log("ChronoClip: Date found in text:", text, parsedDate);
+          
+          // date-parser.jsの形式をcontent-script.jsの期待する形式に変換
+          dateInfo = convertDateParserFormat(parsedDate);
+          dateTextUsed = text;
           break;
         }
       }
@@ -238,7 +362,7 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
     const extractor = window.ChronoClipExtractor;
     if (extractor) {
       try {
-        // 仮想的なイベントオブジェクトを作成してextractor.jsに渡す
+        // 軽量化のため、より簡単なオプションで抽出
         const fakeEventElement = {
           textContent: selectionInfo.text,
           parentElement: selectionInfo.container.element,
@@ -255,7 +379,17 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
           },
         };
 
-        eventData = extractor.extractEventContext(fakeEventElement);
+        // 軽量なオプションで高速化
+        const extractOptions = {
+          includeURL: true,
+          maxChars: 150, // 短縮してパフォーマンス向上
+          headingSearchDepth: 2, // 探索深度を制限
+        };
+
+        eventData = extractor.extractEventContext(
+          fakeEventElement,
+          extractOptions
+        );
         console.log("ChronoClip: Extractor result:", eventData);
       } catch (extractorError) {
         console.warn(
@@ -267,11 +401,15 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
       console.warn("ChronoClip: Event extractor not available, using fallback");
     }
 
-    // 3. 結果をマージ
+    // 3. 日時として使用されたテキストをタイトルから除外
+    let cleanTitle = eventData.title || extractTitleFromSelection(selectionInfo, contextInfo);
+    if (dateTextUsed && cleanTitle) {
+      cleanTitle = removeDateFromTitle(cleanTitle, dateTextUsed);
+    }
+
+    // 4. 結果をマージ
     const result = {
-      title:
-        eventData.title ||
-        extractTitleFromSelection(selectionInfo, contextInfo),
+      title: cleanTitle || "イベント",
       description:
         eventData.description ||
         extractDescriptionFromSelection(selectionInfo, contextInfo),
@@ -282,6 +420,7 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
         heading: contextInfo.heading?.text,
         pageTitle: pageInfo.pageTitle,
         extractedAt: new Date().toISOString(),
+        dateTextUsed: dateTextUsed,
       },
     };
 

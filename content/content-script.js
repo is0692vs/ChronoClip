@@ -1310,14 +1310,8 @@ async function showQuickAddPopupForExtractedData(
     const endTimeInput = shadowRoot.getElementById("event-end-time");
     const allDayCheckbox = shadowRoot.getElementById("all-day");
 
-    if (titleInput && eventData.title) {
-      titleInput.value = eventData.title;
-    }
-    if (descriptionInput && eventData.description) {
-      descriptionInput.value = eventData.description;
-    }
-
     // 日付設定
+    let hasValidDate = false;
     if (dateInput && dateInfo && dateInfo.start) {
       let dateStr = "";
       if (dateInfo.start.date) {
@@ -1333,7 +1327,49 @@ async function showQuickAddPopupForExtractedData(
       }
       if (dateStr) {
         dateInput.value = dateStr;
+        hasValidDate = true;
       }
+    }
+
+    // 日付フィールドを編集可能にする
+    if (dateInput) {
+      dateInput.removeAttribute("readonly");
+      dateInput.type = "date";
+
+      if (!hasValidDate) {
+        // 日付が抽出できなかった場合は空白にして、ユーザーが入力しやすくする
+        dateInput.value = "";
+        dateInput.placeholder = "YYYY-MM-DD";
+      }
+    }
+
+    // タイトルと説明の設定（日付の有無で処理を分ける）
+    if (hasValidDate) {
+      // 日付がある場合：タイトルには抽出されたイベントタイトルまたはページタイトル、日付以外の情報を設定
+      if (titleInput) {
+        let titleValue = "";
+        if (
+          eventData.title &&
+          !eventData.title.match(/^\d{4}[年\/\-]\d{1,2}[月\/\-]\d{1,2}/)
+        ) {
+          // 抽出されたタイトルが日付以外の場合
+          titleValue = eventData.title;
+        } else {
+          // ページタイトルまたはデフォルトタイトルを使用
+          titleValue = document.title || "イベント";
+        }
+        titleInput.value = titleValue;
+      }
+    } else {
+      // 日付がない場合：タイトルに抽出されたテキストを設定、日付は空白で手動入力を促す
+      if (titleInput && eventData.title) {
+        titleInput.value = eventData.title;
+      }
+      // 日付フィールドは空白のまま（上記で既に設定済み）
+    }
+
+    if (descriptionInput && eventData.description) {
+      descriptionInput.value = eventData.description;
     }
 
     // 時刻設定
@@ -1367,12 +1403,29 @@ async function showQuickAddPopupForExtractedData(
     }
 
     // イベントハンドラー設定
-    const closeBtn = shadowRoot.querySelector(".close-btn, #close-popup");
+    const closeBtn = shadowRoot.querySelector(".close-button");
+    const cancelBtn = shadowRoot.querySelector(".cancel-button");
+
     if (closeBtn) {
       closeBtn.addEventListener("click", () => {
         popupHost.remove();
       });
     }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", () => {
+        popupHost.remove();
+      });
+    }
+
+    // Escキーでポップアップを閉じる
+    const escapeHandler = (e) => {
+      if (e.key === "Escape") {
+        popupHost.remove();
+        document.removeEventListener("keydown", escapeHandler);
+      }
+    };
+    document.addEventListener("keydown", escapeHandler);
 
     // フォーム送信処理
     const form = shadowRoot.querySelector("form");
@@ -1389,6 +1442,27 @@ async function showQuickAddPopupForExtractedData(
           const date = formData.get("date");
           const isAllDay = formData.get("all-day") === "on";
 
+          // バリデーション
+          if (!date) {
+            showToast("error", "日付を入力してください");
+            const dateInput = shadowRoot.getElementById("event-date");
+            if (dateInput) {
+              dateInput.style.border = "1px solid red";
+              dateInput.focus();
+            }
+            return;
+          }
+
+          if (!title.trim()) {
+            showToast("error", "タイトルを入力してください");
+            const titleInput = shadowRoot.getElementById("event-title");
+            if (titleInput) {
+              titleInput.style.border = "1px solid red";
+              titleInput.focus();
+            }
+            return;
+          }
+
           let eventPayload;
 
           if (isAllDay) {
@@ -1402,6 +1476,16 @@ async function showQuickAddPopupForExtractedData(
           } else {
             const startTime = formData.get("start-time");
             const endTime = formData.get("end-time");
+
+            if (!startTime) {
+              showToast("error", "開始時刻を入力してください");
+              const timeInput = shadowRoot.getElementById("event-time");
+              if (timeInput) {
+                timeInput.style.border = "1px solid red";
+                timeInput.focus();
+              }
+              return;
+            }
             const startDateTime = `${date}T${startTime}:00`;
             const endDateTime = `${date}T${endTime}:00`;
 
