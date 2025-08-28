@@ -23,6 +23,12 @@
       "css": ["content/content.css"]
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["quick-add-popup.html", "quick-add-popup.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
