@@ -1,2 +1,13 @@
 .gemini/
 gha-creds-*.json
+# Chrome拡張機能の秘密鍵
+*.pem
+
+# 実際のクライアントIDが書かれている manifest.json
+# (ローカルでの開発にのみ使用し、公開しない)
+manifest.json
+
+# その他、一般的な除外ファイル
+node_modules/
+dist/
+.DS_Store
