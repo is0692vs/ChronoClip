@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "ChronoClip",
+  "version": "0.1.0",
+  "description": "ウェブサイト上の日付情報を検出し、Googleカレンダーに簡単に追加できるようにする拡張機能です。",
+  "key": "YOUR_GENERATED_EXTENSION_KEY",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "identity"
+  ],
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_CLOUD_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.events.readonly",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "lib/regex-patterns.js",
+        "lib/date-utils.js",
+        "lib/chrono.min.js",
+        "content/content-script.js"
+      ],
+      "css": ["content/content.css"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["quick-add-popup.html", "quick-add-popup.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "options/options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

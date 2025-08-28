@@ -104,3 +104,15 @@ ChronoClip は、ウェブサイト上の日付情報を自動的に検出し、
 ---
 
 ChronoClip はウェブブラウジングをより生産的にし、情報管理の手間を劇的に削減することを目指しています。日常的なスケジュール管理をシームレスにすることで、より重要なことに集中できる環境づくりをサポートします。
+
+## セットアップ
+
+## 開発環境のセットアップ
+
+1.  Google Cloud Console であなた自身の OAuth 2.0 クライアント ID を作成してください。
+    *   アプリケーションの種類は「Chromeアプリ」を選択し、アプリケーションIDには拡張機能のID（開発中は`chrome://extensions`で確認できるID）を入力してください。
+2.  このリポジトリにある `manifest.example.json` ファイルをコピーし、`manifest.json` という名前に変更します。
+3.  新しく作成した `manifest.json` を開き、以下のプレースホルダーを置き換えてください。
+    *   `"YOUR_GOOGLE_CLOUD_OAUTH_CLIENT_ID.apps.googleusercontent.com"` の部分を、ステップ 1 で取得したあなた自身のクライアント ID に置き換えます。
+    *   `"YOUR_GENERATED_EXTENSION_KEY"` の部分を、拡張機能のIDを固定するためのキーに置き換えます。このキーは、一度拡張機能をロードしてIDを確認し、そのIDからキーを生成するツール（例: [https://www.extensionid.com/](https://www.extensionid.com/)）などを使って生成できます。
+4.  Chrome 拡張機能の管理画面で、このフォルダを「パッケージ化されていない拡張機能」として読み込みます。
