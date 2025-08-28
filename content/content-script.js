@@ -1,4 +1,23 @@
 // content/content-script.js
+/**
+ * 日付スキャンの対象外とするCSSセレクターのリスト。
+ * スクリプト、スタイルシート、編集可能な要素などを無視してパフォーマンスを向上させる。
+ */
+const ignoreSelectors = [
+  "script",
+  "style",
+  "noscript",
+  "textarea",
+  "input",
+  "select",
+  "button",
+  "[contenteditable]", // ユーザーが直接編集する要素
+  "time", // <time>タグは別途解釈することが多いため除外
+  ".code",
+  ".CodeMirror",
+  ".ace_editor",
+  "pre", // コード表示エリア
+];
 
 /**
  * @fileoverview ChronoClipのメインコンテンツスクリプト。
@@ -88,7 +107,10 @@
       handler: (match) => {
         const [, year, , month, day] = match;
         if (isValidDate(year, month, day)) {
-          const normalizedDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const normalizedDate = `${year}-${String(month).padStart(
+            2,
+            "0"
+          )}-${String(day).padStart(2, "0")}`;
           return { normalizedDate, original: match[0] };
         }
         return null;
@@ -100,7 +122,10 @@
       handler: (match) => {
         const [, year, month, day] = match;
         if (isValidDate(year, month, day)) {
-          const normalizedDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const normalizedDate = `${year}-${String(month).padStart(
+            2,
+            "0"
+          )}-${String(day).padStart(2, "0")}`;
           return { normalizedDate, original: match[0] };
         }
         return null;
@@ -113,7 +138,10 @@
         const [, era, eraYearStr, month, day] = match;
         const year = convertWarekiToGregorianYear(era, eraYearStr);
         if (year && isValidDate(year, month, day)) {
-          const normalizedDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const normalizedDate = `${year}-${String(month).padStart(
+            2,
+            "0"
+          )}-${String(day).padStart(2, "0")}`;
           return { normalizedDate, original: match[0] };
         }
         return null;
@@ -133,7 +161,10 @@
           )
         ) {
           const year = resolvedDate.getFullYear();
-          const normalizedDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const normalizedDate = `${year}-${String(month).padStart(
+            2,
+            "0"
+          )}-${String(day).padStart(2, "0")}`;
           return { normalizedDate, original: match[0] };
         }
         return null;
@@ -263,21 +294,21 @@
       hideQuickAddPopup();
     }
 
-    quickAddPopupHost = document.createElement('div');
-    quickAddPopupHost.style.position = 'absolute';
-    quickAddPopupHost.style.zIndex = '99999'; // 最前面に表示
+    quickAddPopupHost = document.createElement("div");
+    quickAddPopupHost.style.position = "absolute";
+    quickAddPopupHost.style.zIndex = "99999"; // 最前面に表示
     document.body.appendChild(quickAddPopupHost);
 
-    const shadowRoot = quickAddPopupHost.attachShadow({ mode: 'open' });
+    const shadowRoot = quickAddPopupHost.attachShadow({ mode: "open" });
 
     try {
       // HTMLとCSSをフェッチ
-      const htmlUrl = chrome.runtime.getURL('quick-add-popup.html');
-      const cssUrl = chrome.runtime.getURL('quick-add-popup.css');
+      const htmlUrl = chrome.runtime.getURL("quick-add-popup.html");
+      const cssUrl = chrome.runtime.getURL("quick-add-popup.css");
 
       const [htmlResponse, cssResponse] = await Promise.all([
         fetch(htmlUrl),
-        fetch(cssUrl)
+        fetch(cssUrl),
       ]);
 
       const htmlText = await htmlResponse.text();
@@ -287,26 +318,28 @@
       shadowRoot.innerHTML = htmlText;
 
       // CSSをShadow DOMに適用
-      const style = document.createElement('style');
+      const style = document.createElement("style");
       style.textContent = cssText;
       shadowRoot.appendChild(style);
 
       // 日付フィールドに値を設定
-      const eventDateInput = shadowRoot.getElementById('event-date');
+      const eventDateInput = shadowRoot.getElementById("event-date");
       if (eventDateInput) {
         eventDateInput.value = normalizedDate;
       }
 
       // ポップアップの位置を調整
-      const popupElement = shadowRoot.querySelector('.chronoclip-quick-add-popup');
+      const popupElement = shadowRoot.querySelector(
+        ".chronoclip-quick-add-popup"
+      );
       if (popupElement) {
         // ポップアップのサイズを取得（レンダリング後に取得する必要がある）
         // 一時的に表示してサイズを測る
-        popupElement.style.visibility = 'hidden';
-        popupElement.style.display = 'block'; // display noneだとサイズが取れない
+        popupElement.style.visibility = "hidden";
+        popupElement.style.display = "block"; // display noneだとサイズが取れない
         const popupRect = popupElement.getBoundingClientRect();
-        popupElement.style.visibility = '';
-        popupElement.style.display = '';
+        popupElement.style.visibility = "";
+        popupElement.style.display = "";
 
         let top = e.clientY + window.scrollY + 10; // クリック位置から少し下に
         let left = e.clientX + window.scrollX + 10; // クリック位置から少し右に
@@ -314,7 +347,8 @@
         // 画面下部からはみ出さないように調整
         if (top + popupRect.height > window.innerHeight + window.scrollY) {
           top = window.innerHeight + window.scrollY - popupRect.height - 10;
-          if (top < window.scrollY) { // 画面に収まらない場合は上端に
+          if (top < window.scrollY) {
+            // 画面に収まらない場合は上端に
             top = window.scrollY + 10;
           }
         }
@@ -322,7 +356,8 @@
         // 画面右端からはみ出さないように調整
         if (left + popupRect.width > window.innerWidth + window.scrollX) {
           left = window.innerWidth + window.scrollX - popupRect.width - 10;
-          if (left < window.scrollX) { // 画面に収まらない場合は左端に
+          if (left < window.scrollX) {
+            // 画面に収まらない場合は左端に
             left = window.scrollX + 10;
           }
         }
@@ -332,27 +367,27 @@
       }
 
       // イベントリスナーを設定
-      const closeButton = shadowRoot.querySelector('.close-button');
+      const closeButton = shadowRoot.querySelector(".close-button");
       if (closeButton) {
-        closeButton.addEventListener('click', hideQuickAddPopup);
+        closeButton.addEventListener("click", hideQuickAddPopup);
       }
 
-      const cancelButton = shadowRoot.querySelector('.cancel-button');
+      const cancelButton = shadowRoot.querySelector(".cancel-button");
       if (cancelButton) {
-        cancelButton.addEventListener('click', hideQuickAddPopup);
+        cancelButton.addEventListener("click", hideQuickAddPopup);
       }
 
-      const addButton = shadowRoot.querySelector('.add-button');
+      const addButton = shadowRoot.querySelector(".add-button");
       if (addButton) {
-        addButton.addEventListener('click', (event) => {
+        addButton.addEventListener("click", (event) => {
           event.preventDefault(); // フォームのデフォルト送信を防ぐ
-          const eventTitle = shadowRoot.getElementById('event-title').value;
-          const eventDetails = shadowRoot.getElementById('event-details').value;
+          const eventTitle = shadowRoot.getElementById("event-title").value;
+          const eventDetails = shadowRoot.getElementById("event-details").value;
 
-          console.log('ChronoClip: Add button clicked!');
-          console.log('Date:', normalizedDate);
-          console.log('Title:', eventTitle);
-          console.log('Details:', eventDetails);
+          console.log("ChronoClip: Add button clicked!");
+          console.log("Date:", normalizedDate);
+          console.log("Title:", eventTitle);
+          console.log("Details:", eventDetails);
 
           // TODO: ここでGoogleカレンダーへの追加処理を実装
           // chrome.runtime.sendMessage({
@@ -370,10 +405,9 @@
       }
 
       // キーボードショートカット (Escapeキーで閉じる)
-      document.addEventListener('keydown', handleKeyDown);
-
+      document.addEventListener("keydown", handleKeyDown);
     } catch (error) {
-      console.error('ChronoClip: Error loading quick add popup:', error);
+      console.error("ChronoClip: Error loading quick add popup:", error);
       if (quickAddPopupHost) {
         quickAddPopupHost.remove();
         quickAddPopupHost = null;
@@ -388,7 +422,7 @@
     if (quickAddPopupHost) {
       quickAddPopupHost.remove();
       quickAddPopupHost = null;
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     }
   }
 
@@ -397,7 +431,7 @@
    * @param {KeyboardEvent} event
    */
   function handleKeyDown(event) {
-    if (event.key === 'Escape') {
+    if (event.key === "Escape") {
       hideQuickAddPopup();
     }
   }
@@ -529,3 +563,35 @@
   // body要素とその子孫の変更を監視
   observer.observe(document.body, { childList: true, subtree: true });
 })();
+
+/**
+ * サービスワーカーからのメッセージをリッスンします。
+ */
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "show_toast") {
+    showToast(message.payload.type, message.payload.message);
+  }
+});
+
+/**
+ * ページ右下にトースト通知を表示します。
+ * @param {'success' | 'error'} type - トーストの種類
+ * @param {string} message - 表示するメッセージ
+ */
+function showToast(type, message) {
+  // トースト要素を作成
+  const toast = document.createElement("div");
+  toast.className = `chronoclip-toast chronoclip-toast-${type}`;
+  toast.textContent = message;
+
+  // ページに追加
+  document.body.appendChild(toast);
+
+  // 3秒後にアニメーション付きで削除
+  setTimeout(() => {
+    toast.classList.add("chronoclip-toast-fade-out");
+    toast.addEventListener("transitionend", () => {
+      toast.remove();
+    });
+  }, 3000);
+}

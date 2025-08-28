@@ -3,17 +3,18 @@
   "name": "ChronoClip",
   "version": "0.1.0",
   "description": "ウェブサイト上の日付情報を検出し、Googleカレンダーに簡単に追加できるようにする拡張機能です。",
-  "key": "YOUR_GENERATED_EXTENSION_KEY",
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
-    "identity"
+    "identity",
+    "notifications",
+    "contextMenus"
   ],
   "oauth2": {
     "client_id": "YOUR_GOOGLE_CLOUD_OAUTH_CLIENT_ID.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/calendar.events.readonly",
+      "https://www.googleapis.com/auth/calendar.events",
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile"
     ]
