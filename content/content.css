@@ -26,11 +26,38 @@
   background-color: #fff;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   padding: 2px;
   z-index: 9999;
 }
 
 .chronoclip-date:hover .chronoclip-icon {
   display: inline-block; /* ホバー時にアイコンを表示 */
+}
+
+.chronoclip-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 15px 25px;
+  border-radius: 8px;
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  font-size: 16px;
+  z-index: 999999;
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.chronoclip-toast-success {
+  background-color: #28a745; /* 緑色 */
+}
+
+.chronoclip-toast-error {
+  background-color: #dc3545; /* 赤色 */
+}
+
+.chronoclip-toast-fade-out {
+  opacity: 0;
 }

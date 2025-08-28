@@ -187,6 +187,22 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+/**
+ * 現在アクティブなタブにトースト表示のメッセージを送信します。
+ * @param {'success' | 'error'} type - トーストの種類
+ * @param {string} message - 表示するメッセージ
+ */
+function showToastInActiveTab(type, message) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        type: "show_toast",
+        payload: { type, message },
+      });
+    }
+  });
+}
+
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === CONTEXT_MENU_ID) {
     const tomorrow = new Date();
@@ -208,17 +224,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
     createEvent(testEvent)
       .then((event) => {
-        showNotification(
-          "success",
-          "テストイベントを追加しました",
-          event.summary,
-          event.htmlLink
-        );
+        showToastInActiveTab("success", `予定を追加しました: ${event.summary}`);
       })
       .catch((err) => {
-        console.error("Failed to create test event:", err);
         const errorMessage = getErrorMessage(err);
-        showNotification("error", "テストイベントの追加に失敗", errorMessage);
+        showToastInActiveTab("error", `エラー: ${errorMessage}`);
       });
   }
 });
