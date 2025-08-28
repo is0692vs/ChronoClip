@@ -6,9 +6,14 @@
  * それらを検証してハイライト表示し、イベントリスナーを追加します。
  */
 
-(function() {
+(function () {
   // --- 依存関係のチェック ---
-  if (typeof ChronoClip === 'undefined' || !ChronoClip.DATE_PATTERN || !ChronoClip.isValidDate || typeof chrono === 'undefined') {
+  if (
+    typeof ChronoClip === "undefined" ||
+    !ChronoClip.DATE_PATTERN ||
+    !ChronoClip.isValidDate ||
+    typeof chrono === "undefined"
+  ) {
     console.error("ChronoClip: 依存関係が正しく読み込まれていません。");
     return;
   }
@@ -22,7 +27,7 @@
     DATE_PATTERN,
     WAREKI_DATE_PATTERN,
     MONTH_DAY_DATE_PATTERN,
-    JA_YYYY_MM_DD_PATTERN
+    JA_YYYY_MM_DD_PATTERN,
   } = ChronoClip;
 
   // --- 日付検出器の定義 (既存のものを再利用) ---
@@ -31,44 +36,51 @@
       name: "日本語の相対日付 (JA Relative)",
       pattern: /(今日|明日|昨日|来週|先週|今月末|来月|先月)/gi,
       handler: (match) => {
-          const text = match[0];
-          const refDate = new Date();
-          refDate.setHours(0, 0, 0, 0);
-          let startDate = new Date(refDate);
+        const text = match[0];
+        const refDate = new Date();
+        refDate.setHours(0, 0, 0, 0);
+        let startDate = new Date(refDate);
 
-          switch (text) {
-              case '今日':
-                  break;
-              case '明日':
-                  startDate.setDate(startDate.getDate() + 1);
-                  break;
-              case '昨日':
-                  startDate.setDate(startDate.getDate() - 1);
-                  break;
-              case '来週':
-                  startDate.setDate(startDate.getDate() + 7);
-                  break;
-              case '先週':
-                  startDate.setDate(startDate.getDate() - 7);
-                  break;
-              case '今月末':
-                  startDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-                  break;
-              case '来月':
-                  startDate.setMonth(startDate.getMonth() + 1, 1);
-                  break;
-              case '先月':
-                  startDate.setMonth(startDate.getMonth() - 1, 1);
-                  break;
-          }
-          
-          const year = startDate.getFullYear();
-          const month = startDate.getMonth() + 1;
-          const day = startDate.getDate();
+        switch (text) {
+          case "今日":
+            break;
+          case "明日":
+            startDate.setDate(startDate.getDate() + 1);
+            break;
+          case "昨日":
+            startDate.setDate(startDate.getDate() - 1);
+            break;
+          case "来週":
+            startDate.setDate(startDate.getDate() + 7);
+            break;
+          case "先週":
+            startDate.setDate(startDate.getDate() - 7);
+            break;
+          case "今月末":
+            startDate = new Date(
+              startDate.getFullYear(),
+              startDate.getMonth() + 1,
+              0
+            );
+            break;
+          case "来月":
+            startDate.setMonth(startDate.getMonth() + 1, 1);
+            break;
+          case "先月":
+            startDate.setMonth(startDate.getMonth() - 1, 1);
+            break;
+        }
 
-          const normalizedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          return { normalizedDate, original: match[0] };
-      }
+        const year = startDate.getFullYear();
+        const month = startDate.getMonth() + 1;
+        const day = startDate.getDate();
+
+        const normalizedDate = `${year}-${String(month).padStart(
+          2,
+          "0"
+        )}-${String(day).padStart(2, "0")}`;
+        return { normalizedDate, original: match[0] };
+      },
     },
     {
       name: "YYYY-MM-DD or YYYY/MM/DD",
@@ -76,11 +88,14 @@
       handler: (match) => {
         const [, year, , month, day] = match;
         if (isValidDate(year, month, day)) {
-          const normalizedDate = `${year}-${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const normalizedDate = `${year}-${String(year).padStart(
+            4,
+            "0"
+          )}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           return { normalizedDate, original: match[0] };
         }
         return null;
-      }
+      },
     },
     {
       name: "YYYY年M月D日 (JA)",
@@ -88,11 +103,14 @@
       handler: (match) => {
         const [, year, month, day] = match;
         if (isValidDate(year, month, day)) {
-          const normalizedDate = `${year}-${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const normalizedDate = `${year}-${String(year).padStart(
+            4,
+            "0"
+          )}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           return { normalizedDate, original: match[0] };
         }
         return null;
-      }
+      },
     },
     {
       name: "和暦 (Wareki)",
@@ -101,11 +119,14 @@
         const [, era, eraYearStr, month, day] = match;
         const year = convertWarekiToGregorianYear(era, eraYearStr);
         if (year && isValidDate(year, month, day)) {
-          const normalizedDate = `${year}-${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const normalizedDate = `${year}-${String(year).padStart(
+            4,
+            "0"
+          )}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           return { normalizedDate, original: match[0] };
         }
         return null;
-      }
+      },
     },
     {
       name: "月日 (Month-Day)",
@@ -113,14 +134,23 @@
       handler: (match) => {
         const [, month, day] = match;
         const resolvedDate = resolveYearForMonthDay(month, day);
-        if (isValidDate(resolvedDate.getFullYear(), resolvedDate.getMonth() + 1, resolvedDate.getDate())) {
+        if (
+          isValidDate(
+            resolvedDate.getFullYear(),
+            resolvedDate.getMonth() + 1,
+            resolvedDate.getDate()
+          )
+        ) {
           const year = resolvedDate.getFullYear();
-          const normalizedDate = `${year}-${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const normalizedDate = `${year}-${String(year).padStart(
+            4,
+            "0"
+          )}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           return { normalizedDate, original: match[0] };
         }
         return null;
-      }
-    }
+      },
+    },
   ];
 
   // カレンダーアイコンのSVG
@@ -136,7 +166,7 @@
    */
   function processTextNode(textNode) {
     const text = textNode.nodeValue;
-    if (!text || text.trim() === '') {
+    if (!text || text.trim() === "") {
       return;
     }
 
@@ -148,20 +178,22 @@
     const chronoResults = chrono.parse(text, new Date());
     const allMatches = [];
 
-    chronoResults.forEach(result => {
+    chronoResults.forEach((result) => {
       const date = result.start.date();
-      const normalizedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const normalizedDate = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       allMatches.push({
         date: normalizedDate,
         original: result.text,
         index: result.index,
-        detector: 'chrono-node',
-        endIndex: result.index + result.text.length
+        detector: "chrono-node",
+        endIndex: result.index + result.text.length,
       });
     });
 
     // カスタム正規表現検出器による解析
-    detectors.forEach(detector => {
+    detectors.forEach((detector) => {
       detector.pattern.lastIndex = 0; // 各検出器でlastIndexをリセット
       let match;
       while ((match = detector.pattern.exec(text)) !== null) {
@@ -172,7 +204,7 @@
             original: result.original,
             index: match.index,
             detector: detector.name,
-            endIndex: match.index + result.original.length
+            endIndex: match.index + result.original.length,
           });
         }
       }
@@ -183,7 +215,7 @@
     const uniqueMatches = [];
     let lastEndIndex = -1;
 
-    allMatches.forEach(match => {
+    allMatches.forEach((match) => {
       // 重複する範囲をスキップ
       if (match.index >= lastEndIndex) {
         uniqueMatches.push(match);
@@ -191,33 +223,40 @@
       }
     });
 
-    uniqueMatches.forEach(match => {
+    uniqueMatches.forEach((match) => {
       // マッチ前のテキストを追加
       if (match.index > lastIndex) {
-        fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+        fragment.appendChild(
+          document.createTextNode(text.substring(lastIndex, match.index))
+        );
       }
 
       // 日付要素を作成し、イベントリスナーを追加
-      const dateSpan = document.createElement('span');
-      dateSpan.className = 'chronoclip-date';
+      const dateSpan = document.createElement("span");
+      dateSpan.className = "chronoclip-date";
       dateSpan.textContent = match.original;
       dateSpan.dataset.normalizedDate = match.date; // 正規化された日付をデータ属性に保存
 
       // カレンダーアイコンを追加
-      dateSpan.insertAdjacentHTML('beforeend', CALENDAR_ICON_SVG);
+      dateSpan.insertAdjacentHTML("beforeend", CALENDAR_ICON_SVG);
 
       // イベントリスナー
-      dateSpan.addEventListener('click', (e) => {
+      dateSpan.addEventListener("click", (e) => {
         e.stopPropagation(); // 親要素へのイベント伝播を防ぐ
-        console.log('ChronoClip: Date clicked!', match.original, 'Normalized:', match.date);
+        console.log(
+          "ChronoClip: Date clicked!",
+          match.original,
+          "Normalized:",
+          match.date
+        );
         // ここにカレンダー追加などのアクションを実装
         chrome.runtime.sendMessage({
           type: "date_clicked",
           payload: {
             originalDate: match.original,
             normalizedDate: match.date,
-            url: window.location.href
-          }
+            url: window.location.href,
+          },
         });
       });
 
@@ -242,69 +281,43 @@
   function findAndHighlightDates() {
     // 既に処理済みの要素を避けるためのセレクタ
     const ignoreSelectors = [
-      'script', 'style', 'noscript', 'iframe', 'canvas', 'svg', 'img', 'video', 'audio',
-      '.chronoclip-date', // 既に処理済みの要素
+      "script",
+      "style",
+      "noscript",
+      "iframe",
+      "canvas",
+      "svg",
+      "img",
+      "video",
+      "audio",
+      ".chronoclip-date", // 既に処理済みの要素
       '[contenteditable="true"]', // 編集可能な要素
-      'input', 'textarea', 'select' // フォーム要素
+      "input",
+      "textarea",
+      "select", // フォーム要素
     ];
-  const ignoreSelectors = [
-    'script', 'style', 'noscript', 'iframe', 'canvas', 'svg', 'img', 'video', 'audio',
-    '.chronoclip-date', // 既に処理済みの要素
-    '[contenteditable="true"]', // 編集可能な要素
-    'input', 'textarea', 'select' // フォーム要素
-  ];
 
-  /**
-   * ページ全体を走査して日付を検出・処理します。
-   */
-  function findAndHighlightDates() {
-    // 既に処理済みの要素を避けるためのセレクタ
     const treeWalker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
       {
-        acceptNode: function(node) {
+        acceptNode: function (node) {
           // 親要素が無視リストに含まれる場合はスキップ
           let currentNode = node.parentNode;
           while (currentNode && currentNode !== document.body) {
-            if (ignoreSelectors.some(selector => currentNode.matches(selector))) {
-  function createAcceptNode(rootNode) {
-    return function(node) {
-      // 親要素が無視リストに含まれる場合はスキップ
-      let currentNode = node.parentNode;
-      while (currentNode && currentNode !== rootNode) {
-        if (ignoreSelectors.some(selector => currentNode.matches(selector))) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        currentNode = currentNode.parentNode;
-      }
-      // 空白のみのテキストノードはスキップ
-      if (node.nodeValue.trim() === '') {
-        return NodeFilter.FILTER_REJECT;
-      }
-      return NodeFilter.FILTER_ACCEPT;
-    }
-  }
-
-  /**
-   * ページ全体を走査して日付を検出・処理します。
-   */
-  function findAndHighlightDates() {
-    const treeWalker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      { acceptNode: createAcceptNode(document.body) },
-      false
-    );
+            if (
+              ignoreSelectors.some((selector) => currentNode.matches(selector))
+            ) {
+              return NodeFilter.FILTER_REJECT;
             }
             currentNode = currentNode.parentNode;
           }
           // 空白のみのテキストノードはスキップ
-          if (node.nodeValue.trim() === '') {
+          if (node.nodeValue.trim() === "") {
             return NodeFilter.FILTER_REJECT;
           }
           return NodeFilter.FILTER_ACCEPT;
-        }
+        },
       },
       false
     );
@@ -317,7 +330,7 @@
     }
 
     // 収集したテキストノードを処理
-    textNodesToProcess.forEach(node => {
+    textNodesToProcess.forEach((node) => {
       try {
         processTextNode(node);
       } catch (e) {
@@ -329,8 +342,8 @@
   }
 
   // DOMContentLoadedイベントを待ってから処理を開始
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', findAndHighlightDates);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", findAndHighlightDates);
   } else {
     findAndHighlightDates();
   }
@@ -346,20 +359,24 @@
               node,
               NodeFilter.SHOW_TEXT,
               {
-                acceptNode: function(n) {
+                acceptNode: function (n) {
                   // 既に処理済みの要素や無視リストに含まれる要素はスキップ
                   let currentNode = n.parentNode;
                   while (currentNode && currentNode !== node) {
-                    if (ignoreSelectors.some(selector => currentNode.matches(selector))) {
+                    if (
+                      ignoreSelectors.some((selector) =>
+                        currentNode.matches(selector)
+                      )
+                    ) {
                       return NodeFilter.FILTER_REJECT;
                     }
                     currentNode = currentNode.parentNode;
                   }
-                  if (n.nodeValue.trim() === '') {
+                  if (n.nodeValue.trim() === "") {
                     return NodeFilter.FILTER_REJECT;
                   }
                   return NodeFilter.FILTER_ACCEPT;
-                }
+                },
               },
               false
             );
@@ -368,7 +385,11 @@
               try {
                 processTextNode(currentNode);
               } catch (e) {
-                console.error("ChronoClip: Error processing dynamically added node:", currentNode, e);
+                console.error(
+                  "ChronoClip: Error processing dynamically added node:",
+                  currentNode,
+                  e
+                );
               }
               currentNode = treeWalker.nextNode();
             }
@@ -380,5 +401,4 @@
 
   // body要素とその子孫の変更を監視
   observer.observe(document.body, { childList: true, subtree: true });
-
 })();
