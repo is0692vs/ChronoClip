@@ -294,6 +294,30 @@ const ignoreSelectors = [
       hideQuickAddPopup();
     }
 
+    // イベント情報を自動抽出
+    let extractedEvent = null;
+    try {
+      if (window.ChronoClipExtractor && e.target) {
+        // オプション設定を取得
+        const options = { includeURL: true }; // デフォルト値
+
+        // ストレージからオプションを非同期で取得
+        chrome.storage.sync.get(["includeURL"], (result) => {
+          if (result.includeURL !== undefined) {
+            options.includeURL = result.includeURL;
+          }
+        });
+
+        extractedEvent = window.ChronoClipExtractor.extractEventContext(
+          e.target,
+          options
+        );
+        console.log("ChronoClip: Extracted event context:", extractedEvent);
+      }
+    } catch (error) {
+      console.error("ChronoClip: Error extracting event context:", error);
+    }
+
     quickAddPopupHost = document.createElement("div");
     quickAddPopupHost.style.position = "absolute";
     quickAddPopupHost.style.zIndex = "99999"; // 最前面に表示
@@ -326,6 +350,24 @@ const ignoreSelectors = [
       const eventDateInput = shadowRoot.getElementById("event-date");
       if (eventDateInput) {
         eventDateInput.value = normalizedDate;
+      }
+
+      // 抽出されたイベント情報をフォームに自動入力
+      if (extractedEvent) {
+        const eventTitleInput = shadowRoot.getElementById("event-title");
+        const eventDetailsInput = shadowRoot.getElementById("event-details");
+
+        if (eventTitleInput && extractedEvent.title && !eventTitleInput.value) {
+          eventTitleInput.value = extractedEvent.title;
+        }
+
+        if (
+          eventDetailsInput &&
+          extractedEvent.description &&
+          !eventDetailsInput.value
+        ) {
+          eventDetailsInput.value = extractedEvent.description;
+        }
       }
 
       // ポップアップの位置を調整
@@ -416,10 +458,14 @@ const ignoreSelectors = [
               }
 
               if (response && response.ok) {
-                showToast("success", `予定「${eventPayload.summary}」を追加しました。`);
+                showToast(
+                  "success",
+                  `予定「${eventPayload.summary}」を追加しました。`
+                );
               } else {
                 const errorMessage =
-                  response?.message || "不明なエラーで予定の追加に失敗しました。";
+                  response?.message ||
+                  "不明なエラーで予定の追加に失敗しました。";
                 showToast("error", `エラー: ${errorMessage}`);
               }
             }

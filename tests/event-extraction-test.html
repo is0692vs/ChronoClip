@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChronoClip イベント抽出テスト</title>
+    <style>
+      body {
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .test-container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      .test-header {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+      }
+      .test-case {
+        background: #f8f9fa;
+        padding: 15px;
+        border-left: 4px solid #28a745;
+        margin: 10px 0;
+      }
+      .test-case.error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+      .result {
+        background: #e9ecef;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      #output {
+        font-family: monospace;
+        background: #2c3e50;
+        color: #ecf0f1;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .chronoclip-date {
+        background: #ffd700;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      .notice {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-container">
+      <h1 class="test-header">ChronoClip イベント抽出機能テスト</h1>
+
+      <div class="notice">
+        <strong>📝 テスト方法:</strong>
+        <ol>
+          <li>各サンプルの黄色い日付をクリックしてください</li>
+          <li>
+            Chrome拡張機能が有効な場合、自動的に抽出結果がコンソールに表示されます
+          </li>
+          <li>「スタンドアロンテスト実行」ボタンで独立したテストも可能です</li>
+        </ol>
+      </div>
+
+      <div style="margin-bottom: 20px">
+        <button onclick="window.testController.runAllTests()">
+          スタンドアロンテスト実行
+        </button>
+        <button onclick="window.testController.clearOutput()">
+          出力クリア
+        </button>
+        <button onclick="window.testController.showConsoleInstructions()">
+          コンソール確認方法
+        </button>
+      </div>
+
+      <pre id="output"></pre>
+    </div>
+
+    <!-- テストケース用のサンプルHTML -->
+    <div class="test-container">
+      <h2>サンプル1: 見出し直下の日付</h2>
+      <div class="test-case" id="sample1">
+        <h3>夏の大会 2025</h3>
+        <p>
+          開催日:
+          <span class="chronoclip-date" data-normalized-date="2025-08-27"
+            >8月27日(水)</span
+          >
+        </p>
+        <p>会場: 東京ドーム 開場17:00 開演18:00</p>
+        <div class="result" id="result1">
+          <em
+            >上の日付をクリックしてテスト。結果はブラウザのコンソール（F12）で確認できます。</em
+          >
+        </div>
+      </div>
+    </div>
+
+    <div class="test-container">
+      <h2>サンプル2: 箇条書きイベント</h2>
+      <div class="test-case" id="sample2">
+        <h3>今月のイベント</h3>
+        <ul>
+          <li>
+            <strong>プロジェクト発表会</strong>
+            <span class="chronoclip-date" data-normalized-date="2025-08-28"
+              >8月28日</span
+            >
+            <p>各チームの成果発表と質疑応答を行います。</p>
+          </li>
+        </ul>
+        <div class="result" id="result2">
+          <em
+            >上の日付をクリックしてテスト。結果はブラウザのコンソール（F12）で確認できます。</em
+          >
+        </div>
+      </div>
+    </div>
+
+    <div class="test-container">
+      <h2>サンプル3: 離れた要素</h2>
+      <div class="test-case" id="sample3">
+        <header>
+          <h1>重要なお知らせ</h1>
+          <div class="meta">
+            投稿日:
+            <span class="chronoclip-date" data-normalized-date="2025-08-27"
+              >2025年8月27日</span
+            >
+          </div>
+        </header>
+        <div class="content">
+          <p>システムメンテナンスのため、一時的にサービスを停止いたします。</p>
+        </div>
+        <div class="result" id="result3">
+          <em
+            >上の日付をクリックしてテスト。結果はブラウザのコンソール（F12）で確認できます。</em
+          >
+        </div>
+      </div>
+    </div>
+
+    <div class="test-container">
+      <h2>サンプル4: 英語ページ</h2>
+      <div class="test-case" id="sample4">
+        <h2>Annual Conference 2025</h2>
+        <p>
+          Date:
+          <span class="chronoclip-date" data-normalized-date="2025-08-28"
+            >Aug 28, 2025</span
+          >
+        </p>
+        <p>Location: Tokyo International Forum</p>
+        <div class="result" id="result4">
+          <em
+            >上の日付をクリックしてテスト。結果はブラウザのコンソール（F12）で確認できます。</em
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- テスト用の非表示コンテナ -->
+    <div id="test-container" style="display: none"></div>
+
+    <!-- スタンドアロンテスト用のextractor.js読み込み -->
+    <script>
+      // Chrome拡張機能環境ではない場合のみextractor.jsを読み込み
+      if (!window.chrome || !window.chrome.runtime) {
+        const script = document.createElement("script");
+        script.src = "../content/extractor.js";
+        document.head.appendChild(script);
+      }
+    </script>
+
+    <script>
+      // テスト制御オブジェクト
+      window.testController = {
+        output: null,
+
+        init() {
+          this.output = document.getElementById("output");
+          this.log("ChronoClip イベント抽出テストページが読み込まれました。");
+
+          // Chrome拡張機能が有効かチェック
+          if (window.chrome && window.chrome.runtime) {
+            this.log("✓ Chrome拡張機能環境で動作中");
+            this.log(
+              "  日付をクリックすると、自動的に抽出処理が実行されます。"
+            );
+            this.log("  結果はコンソール（F12 → Console）で確認してください。");
+          } else {
+            this.log("⚠ スタンドアロン環境で動作中");
+            this.log("  「スタンドアロンテスト実行」ボタンでテストできます。");
+          }
+        },
+
+        log(message) {
+          if (this.output) {
+            this.output.textContent +=
+              new Date().toLocaleTimeString() + " - " + message + "\n";
+            this.output.scrollTop = this.output.scrollHeight;
+          }
+          console.log("ChronoClip Test:", message);
+        },
+
+        clearOutput() {
+          if (this.output) {
+            this.output.textContent = "";
+          }
+        },
+
+        showConsoleInstructions() {
+          this.log("=== コンソール確認方法 ===");
+          this.log("1. F12キーを押す（またはメニュー → 開発者ツール）");
+          this.log('2. "Console"タブをクリック');
+          this.log("3. 日付をクリックすると抽出結果が表示されます");
+          this.log(
+            '4. "ChronoClip: Extracted event context:"で始まるログを確認'
+          );
+        },
+
+        async runAllTests() {
+          this.log("=== スタンドアロンテスト開始 ===");
+
+          // extractor.jsが読み込まれるまで待機
+          let attempts = 0;
+          while (!window.ChronoClipExtractor && attempts < 10) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            attempts++;
+          }
+
+          if (!window.ChronoClipExtractor) {
+            this.log("✗ extractor.jsが読み込まれていません");
+            this.log(
+              "  Chrome拡張機能環境では、直接日付をクリックしてテストしてください。"
+            );
+            return;
+          }
+
+          const { extractEventContext, normalizeText } =
+            window.ChronoClipExtractor;
+
+          try {
+            // テスト1: 基本的な抽出
+            this.log("--- テスト1: 見出し直下の日付 ---");
+            const html1 = `
+                        <article>
+                            <h2>夏の大会 2025</h2>
+                            <p>開催日: <span class="test-date">8月27日(水)</span></p>
+                            <p>会場: 東京ドーム 開場17:00 開演18:00</p>
+                        </article>
+                    `;
+            const result1 = this.runSingleTest(html1, extractEventContext);
+            this.log(`✓ タイトル: "${result1.title}"`);
+            this.log(`✓ 信頼度: ${result1.confidence.toFixed(3)}`);
+
+            // テスト2: リストイベント
+            this.log("--- テスト2: 箇条書きイベント ---");
+            const html2 = `
+                        <div>
+                            <h3>今月のイベント</h3>
+                            <ul>
+                                <li>
+                                    <strong>プロジェクト発表会</strong>
+                                    <span class="test-date">8月28日</span>
+                                    <p>各チームの成果発表と質疑応答を行います。</p>
+                                </li>
+                            </ul>
+                        </div>
+                    `;
+            const result2 = this.runSingleTest(html2, extractEventContext);
+            this.log(`✓ タイトル: "${result2.title}"`);
+            this.log(`✓ 信頼度: ${result2.confidence.toFixed(3)}`);
+
+            // テスト3: ユーティリティ関数
+            this.log("--- テスト3: ユーティリティ関数 ---");
+            const normalized = normalizeText("  test\n\ntext  \t  ");
+            if (normalized === "test text") {
+              this.log("✓ normalizeText 成功");
+            } else {
+              this.log(`✗ normalizeText 失敗: "${normalized}"`);
+            }
+
+            this.log("=== スタンドアロンテスト完了 ===");
+          } catch (error) {
+            this.log(`✗ テストエラー: ${error.message}`);
+          }
+        },
+
+        runSingleTest(html, extractFunction) {
+          const container = document.getElementById("test-container");
+          container.innerHTML = html;
+          const dateElement = container.querySelector(".test-date");
+
+          if (!dateElement) {
+            throw new Error("テスト用日付要素が見つかりません");
+          }
+
+          return extractFunction(dateElement, { includeURL: false });
+        },
+      };
+
+      // ページ読み込み完了時に初期化
+      document.addEventListener("DOMContentLoaded", () => {
+        window.testController.init();
+      });
+
+      // 日付クリック監視（Chrome拡張機能環境用）
+      document.addEventListener("click", (event) => {
+        if (event.target.classList.contains("chronoclip-date")) {
+          const sampleId = event.target.closest('[id^="sample"]')?.id;
+          if (sampleId) {
+            window.testController.log(
+              `${sampleId}の日付がクリックされました。コンソールで抽出結果を確認してください。`
+            );
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
