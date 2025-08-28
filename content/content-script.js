@@ -13,6 +13,8 @@ const ignoreSelectors = [
   "button",
   "[contenteditable]", // ユーザーが直接編集する要素
   "time", // <time>タグは別途解釈することが多いため除外
+  ".chronoclip-date", // 既に処理済みの要素
+  ".chronoclip-ignore", // トーストなどの無視すべき要素
   ".code",
   ".CodeMirror",
   ".ace_editor",
@@ -26,6 +28,22 @@ const ignoreSelectors = [
  */
 
 (function () {
+  // --- パフォーマンス監視 ---
+  const performanceMonitor = {
+    startTime: performance.now(),
+    processedNodes: 0,
+    extractionCalls: 0,
+
+    log() {
+      const elapsedTime = performance.now() - this.startTime;
+      console.log(
+        `ChronoClip Performance: ${this.processedNodes} nodes processed, ${
+          this.extractionCalls
+        } extractions in ${elapsedTime.toFixed(2)}ms`
+      );
+    },
+  };
+
   // --- 依存関係のチェック ---
   if (
     typeof ChronoClip === "undefined" ||
@@ -185,33 +203,17 @@ const ignoreSelectors = [
    */
   function processTextNode(textNode) {
     const text = textNode.nodeValue;
-    if (!text || text.trim() === "") {
+    if (!text || text.trim() === "" || text.length > 1000) {
+      // 長すぎるテキストは処理しない
       return;
     }
 
     let lastIndex = 0;
     const fragment = document.createDocumentFragment();
     let matchesFound = false;
-
-    // chrono-nodeによる解析
-    const chronoResults = chrono.parse(text, new Date());
     const allMatches = [];
 
-    chronoResults.forEach((result) => {
-      const date = result.start.date();
-      const normalizedDate = `${date.getFullYear()}-${String(
-        date.getMonth() + 1
-      ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      allMatches.push({
-        date: normalizedDate,
-        original: result.text,
-        index: result.index,
-        detector: "chrono-node",
-        endIndex: result.index + result.text.length,
-      });
-    });
-
-    // カスタム正規表現検出器による解析
+    // カスタム正規表現検出器による解析（高速）
     detectors.forEach((detector) => {
       detector.pattern.lastIndex = 0; // 各検出器でlastIndexをリセット
       let match;
@@ -224,10 +226,58 @@ const ignoreSelectors = [
             index: match.index,
             detector: detector.name,
             endIndex: match.index + result.original.length,
+            type: "date", // 日付として分類
           });
         }
       }
     });
+
+    // 時刻パターンも検出（HH:MM形式）
+    const timePattern = /(?:[01]?[0-9]|2[0-3]):[0-5][0-9]/g;
+    let timeMatch;
+    while ((timeMatch = timePattern.exec(text)) !== null) {
+      // 時刻が日付検出範囲と重複していないかチェック
+      const overlaps = allMatches.some(
+        (match) =>
+          timeMatch.index < match.endIndex &&
+          timeMatch.index + timeMatch[0].length > match.index
+      );
+
+      if (!overlaps) {
+        allMatches.push({
+          date: null, // 時刻単体では日付は不明
+          original: timeMatch[0],
+          index: timeMatch.index,
+          detector: "time-pattern",
+          endIndex: timeMatch.index + timeMatch[0].length,
+          type: "time", // 時刻として分類
+        });
+      }
+    }
+
+    // chrono-nodeによる解析（カスタム検出器で見つからない場合のみ）
+    if (allMatches.length === 0 && text.length < 500) {
+      // 短いテキストのみchrono-nodeを使用
+      try {
+        const chronoResults = chrono.parse(text, new Date());
+        chronoResults.forEach((result) => {
+          const date = result.start.date();
+          const normalizedDate = `${date.getFullYear()}-${String(
+            date.getMonth() + 1
+          ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+          allMatches.push({
+            date: normalizedDate,
+            original: result.text,
+            index: result.index,
+            detector: "chrono-node",
+            endIndex: result.index + result.text.length,
+            type: "date", // 日付として分類
+          });
+        });
+      } catch (error) {
+        console.warn("ChronoClip: chrono-node parsing failed:", error);
+      }
+    }
 
     // マッチをインデックス順にソートし、重複を排除
     allMatches.sort((a, b) => a.index - b.index);
@@ -254,7 +304,15 @@ const ignoreSelectors = [
       const dateSpan = document.createElement("span");
       dateSpan.className = "chronoclip-date";
       dateSpan.textContent = match.original;
-      dateSpan.dataset.normalizedDate = match.date; // 正規化された日付をデータ属性に保存
+
+      // データ属性を設定
+      if (match.type === "date") {
+        dateSpan.dataset.normalizedDate = match.date;
+        dateSpan.dataset.type = "date";
+      } else if (match.type === "time") {
+        dateSpan.dataset.time = match.original;
+        dateSpan.dataset.type = "time";
+      }
 
       // カレンダーアイコンを追加
       dateSpan.insertAdjacentHTML("beforeend", CALENDAR_ICON_SVG);
@@ -262,7 +320,15 @@ const ignoreSelectors = [
       // イベントリスナー
       dateSpan.addEventListener("click", (e) => {
         e.stopPropagation(); // 親要素へのイベント伝播を防ぐ
-        showQuickAddPopup(match.date, e);
+
+        if (match.type === "date") {
+          // 日付クリック時は終日予定
+          showQuickAddPopup(match.date, null, e);
+        } else if (match.type === "time") {
+          // 時刻クリック時は近くの日付を探す
+          const nearbyDate = findNearbyDate(e.target);
+          showQuickAddPopup(nearbyDate, match.original, e);
+        }
       });
 
       fragment.appendChild(dateSpan);
@@ -280,28 +346,151 @@ const ignoreSelectors = [
     }
   }
 
+  /**
+   * 時刻要素の近くにある日付を探します
+   * @param {Element} timeElement - 時刻要素
+   * @returns {string|null} 見つかった日付のYYYY-MM-DD形式、または今日の日付
+   */
+  function findNearbyDate(timeElement) {
+    // 1. 同じテキストノード内で日付を探す
+    const parentText = timeElement.closest(
+      "p, div, span, li, td, th, section, article"
+    );
+    if (parentText) {
+      const dateElements = parentText.querySelectorAll(
+        '.chronoclip-date[data-type="date"]'
+      );
+      for (let dateElement of dateElements) {
+        if (dateElement.dataset.normalizedDate) {
+          return dateElement.dataset.normalizedDate;
+        }
+      }
+    }
+
+    // 2. より広い範囲（親コンテナ）で日付を探す
+    const container = timeElement.closest(
+      "article, section, .event, .schedule-item, .match, .card, .item"
+    );
+    if (container) {
+      const dateElements = container.querySelectorAll(
+        '.chronoclip-date[data-type="date"]'
+      );
+      for (let dateElement of dateElements) {
+        if (dateElement.dataset.normalizedDate) {
+          return dateElement.dataset.normalizedDate;
+        }
+      }
+    }
+
+    // 3. テキスト解析で周辺の日付を探す
+    let searchElement = timeElement.parentElement;
+    for (let i = 0; i < 3 && searchElement; i++) {
+      const text = searchElement.textContent;
+
+      // 簡単な日付パターンで検索
+      const datePatterns = [
+        /(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})/,
+        /(\d{1,2})[月\/\-](\d{1,2})/,
+      ];
+
+      for (let pattern of datePatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          let year, month, day;
+          if (match.length === 4) {
+            // YYYY年MM月DD日形式
+            [, year, month, day] = match;
+          } else {
+            // MM月DD日形式（今年を仮定）
+            year = new Date().getFullYear();
+            [, month, day] = match;
+          }
+
+          const normalizedDate = `${year}-${String(month).padStart(
+            2,
+            "0"
+          )}-${String(day).padStart(2, "0")}`;
+          return normalizedDate;
+        }
+      }
+
+      searchElement = searchElement.parentElement;
+    }
+
+    // 4. 見つからない場合は今日の日付を返す
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(today.getDate()).padStart(2, "0")}`;
+  }
+
   let quickAddPopupHost = null; // ポップアップのホスト要素
 
   /**
    * クイック追加ポップアップを表示します。
-   * @param {string} originalDate - 元の日付文字列。
-   * @param {string} normalizedDate - 正規化された日付文字列 (YYYY-MM-DD)。
-   * @param {MouseEvent} e - クリックイベントオブジェクト。
+   * @param {string} normalizedDate - 正規化された日付文字列 (YYYY-MM-DD)
+   * @param {string|null} time - 時刻文字列 (HH:MM) または null（終日の場合）
+   * @param {MouseEvent} e - クリックイベントオブジェクト
    */
-  async function showQuickAddPopup(normalizedDate, e) {
+  async function showQuickAddPopup(normalizedDate, time, e) {
     // 既にポップアップが表示されている場合は非表示にする
     if (quickAddPopupHost) {
       hideQuickAddPopup();
     }
 
+    // イベント情報を自動抽出
+    let extractedEvent = null;
+    try {
+      if (window.ChronoClipExtractor && e.target) {
+        // オプション設定を取得
+        const options = {
+          includeURL: true,
+          maxChars: 200, // 処理を軽くするため短縮
+          headingSearchDepth: 2, // 探索深度も制限
+        };
+
+        // ストレージからオプションを非同期で取得（軽量化）
+        try {
+          // Extension context が有効かチェック
+          if (chrome.runtime?.id) {
+            const result = await new Promise((resolve) => {
+              chrome.storage.sync.get(["includeURL"], resolve);
+            });
+            if (result.includeURL !== undefined) {
+              options.includeURL = result.includeURL;
+            }
+          }
+        } catch (error) {
+          console.warn("ChronoClip: Failed to load options, using defaults");
+        }
+
+        extractedEvent = window.ChronoClipExtractor.extractEventContext(
+          e.target,
+          options
+        );
+        performanceMonitor.extractionCalls++;
+        console.log("ChronoClip: Extracted event context:", extractedEvent);
+      }
+    } catch (error) {
+      console.error("ChronoClip: Error extracting event context:", error);
+    }
+
     quickAddPopupHost = document.createElement("div");
     quickAddPopupHost.style.position = "absolute";
-    quickAddPopupHost.style.zIndex = "99999"; // 最前面に表示
+    quickAddPopupHost.style.zIndex =
+      window.ChronoClipConfig?.UI?.POPUP_Z_INDEX || "99999"; // 最前面に表示
     document.body.appendChild(quickAddPopupHost);
 
     const shadowRoot = quickAddPopupHost.attachShadow({ mode: "open" });
 
     try {
+      // Extension context が有効かチェック
+      if (!chrome.runtime?.id) {
+        console.error("ChronoClip: Extension context invalidated");
+        return;
+      }
+
       // HTMLとCSSをフェッチ
       const htmlUrl = chrome.runtime.getURL("quick-add-popup.html");
       const cssUrl = chrome.runtime.getURL("quick-add-popup.css");
@@ -328,6 +517,70 @@ const ignoreSelectors = [
         eventDateInput.value = normalizedDate;
       }
 
+      // 時刻フィールドの設定
+      const eventTimeInput = shadowRoot.getElementById("event-time");
+      const eventEndTimeInput = shadowRoot.getElementById("event-end-time");
+      const allDayCheckbox = shadowRoot.getElementById("all-day");
+
+      // 終了時刻を計算する関数
+      const calculateEndTime = (startTime) => {
+        if (!startTime) return "";
+        const [hours, minutes] = startTime.split(":").map(Number);
+        const startDate = new Date();
+        startDate.setHours(hours, minutes, 0, 0);
+
+        const durationMs =
+          window.ChronoClipConfig?.EVENT?.DEFAULT_DURATION_MS ||
+          3 * 60 * 60 * 1000;
+        const endDate = new Date(startDate.getTime() + durationMs);
+
+        return (
+          String(endDate.getHours()).padStart(2, "0") +
+          ":" +
+          String(endDate.getMinutes()).padStart(2, "0")
+        );
+      };
+
+      if (time && eventTimeInput && allDayCheckbox) {
+        // 時刻が指定されている場合
+        eventTimeInput.value = time;
+        if (eventEndTimeInput) {
+          eventEndTimeInput.value = calculateEndTime(time);
+        }
+        allDayCheckbox.checked = false;
+        eventTimeInput.classList.remove("hidden");
+        if (eventEndTimeInput) {
+          eventEndTimeInput.classList.remove("hidden");
+        }
+      } else if (allDayCheckbox) {
+        // 終日の場合
+        allDayCheckbox.checked = true;
+        if (eventTimeInput) {
+          eventTimeInput.classList.add("hidden");
+        }
+        if (eventEndTimeInput) {
+          eventEndTimeInput.classList.add("hidden");
+        }
+      }
+
+      // 抽出されたイベント情報をフォームに自動入力
+      if (extractedEvent) {
+        const eventTitleInput = shadowRoot.getElementById("event-title");
+        const eventDetailsInput = shadowRoot.getElementById("event-details");
+
+        if (eventTitleInput && extractedEvent.title && !eventTitleInput.value) {
+          eventTitleInput.value = extractedEvent.title;
+        }
+
+        if (
+          eventDetailsInput &&
+          extractedEvent.description &&
+          !eventDetailsInput.value
+        ) {
+          eventDetailsInput.value = extractedEvent.description;
+        }
+      }
+
       // ポップアップの位置を調整
       const popupElement = shadowRoot.querySelector(
         ".chronoclip-quick-add-popup"
@@ -341,24 +594,26 @@ const ignoreSelectors = [
         popupElement.style.visibility = "";
         popupElement.style.display = "";
 
-        let top = e.clientY + window.scrollY + 10; // クリック位置から少し下に
-        let left = e.clientX + window.scrollX + 10; // クリック位置から少し右に
+        const offset = window.ChronoClipConfig?.UI?.POPUP_OFFSET || 10;
+
+        let top = e.clientY + window.scrollY + offset; // クリック位置から少し下に
+        let left = e.clientX + window.scrollX + offset; // クリック位置から少し右に
 
         // 画面下部からはみ出さないように調整
         if (top + popupRect.height > window.innerHeight + window.scrollY) {
-          top = window.innerHeight + window.scrollY - popupRect.height - 10;
+          top = window.innerHeight + window.scrollY - popupRect.height - offset;
           if (top < window.scrollY) {
             // 画面に収まらない場合は上端に
-            top = window.scrollY + 10;
+            top = window.scrollY + offset;
           }
         }
 
         // 画面右端からはみ出さないように調整
         if (left + popupRect.width > window.innerWidth + window.scrollX) {
-          left = window.innerWidth + window.scrollX - popupRect.width - 10;
+          left = window.innerWidth + window.scrollX - popupRect.width - offset;
           if (left < window.scrollX) {
             // 画面に収まらない場合は左端に
-            left = window.scrollX + 10;
+            left = window.scrollX + offset;
           }
         }
 
@@ -377,6 +632,39 @@ const ignoreSelectors = [
         cancelButton.addEventListener("click", hideQuickAddPopup);
       }
 
+      // 全日チェックボックスのイベントリスナー
+      if (allDayCheckbox && eventTimeInput) {
+        allDayCheckbox.addEventListener("change", (e) => {
+          if (e.target.checked) {
+            eventTimeInput.classList.add("hidden");
+            if (eventEndTimeInput) {
+              eventEndTimeInput.classList.add("hidden");
+            }
+          } else {
+            eventTimeInput.classList.remove("hidden");
+            if (eventEndTimeInput) {
+              eventEndTimeInput.classList.remove("hidden");
+            }
+            if (!eventTimeInput.value && time) {
+              eventTimeInput.value = time; // デフォルト時刻を設定
+              if (eventEndTimeInput) {
+                eventEndTimeInput.value = calculateEndTime(time);
+              }
+            }
+          }
+        });
+      }
+
+      // 開始時刻変更時のイベントリスナー
+      if (eventTimeInput && eventEndTimeInput) {
+        eventTimeInput.addEventListener("change", (e) => {
+          const startTime = e.target.value;
+          if (startTime) {
+            eventEndTimeInput.value = calculateEndTime(startTime);
+          }
+        });
+      }
+
       const addButton = shadowRoot.querySelector(".add-button");
       if (addButton) {
         addButton.addEventListener("click", (event) => {
@@ -392,13 +680,77 @@ const ignoreSelectors = [
             return;
           }
 
-          const eventPayload = {
-            summary: eventTitle,
-            description: eventDetails,
-            start: { date: normalizedDate },
-            end: { date: normalizedDate },
-            url: window.location.href,
-          };
+          const eventTimeInput = shadowRoot.getElementById("event-time");
+          const eventEndTimeInput = shadowRoot.getElementById("event-end-time");
+          const allDayCheckbox = shadowRoot.getElementById("all-day");
+          const isAllDay = allDayCheckbox ? allDayCheckbox.checked : !time;
+
+          let eventPayload;
+
+          if (isAllDay || !eventTimeInput || !eventTimeInput.value) {
+            // 終日イベント
+            eventPayload = {
+              summary: eventTitle,
+              description: eventDetails,
+              start: { date: normalizedDate },
+              end: { date: normalizedDate },
+              url: window.location.href,
+            };
+          } else {
+            // 時刻指定イベント
+            const startTimeValue = eventTimeInput.value;
+            const endTimeValue = eventEndTimeInput
+              ? eventEndTimeInput.value
+              : null;
+
+            if (!startTimeValue) {
+              const timeInput = shadowRoot.getElementById("event-time");
+              timeInput.style.border = "1px solid red";
+              timeInput.focus();
+              return;
+            }
+
+            const startDateTime = `${normalizedDate}T${startTimeValue}:00`;
+            let endDateTime;
+
+            if (endTimeValue) {
+              // 終了時刻が指定されている場合
+              endDateTime = `${normalizedDate}T${endTimeValue}:00`;
+            } else {
+              // 終了時刻が指定されていない場合は設定値で計算
+              const startDate = new Date(startDateTime);
+              const durationMs =
+                window.ChronoClipConfig?.EVENT?.DEFAULT_DURATION_MS ||
+                3 * 60 * 60 * 1000;
+              const endDate = new Date(startDate.getTime() + durationMs);
+              endDateTime = endDate.toISOString().slice(0, 16) + ":00"; // YYYY-MM-DDTHH:MM:SS
+            }
+
+            eventPayload = {
+              summary: eventTitle,
+              description: eventDetails,
+              start: {
+                dateTime: startDateTime,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              },
+              end: {
+                dateTime: endDateTime,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              },
+              url: window.location.href,
+            };
+          }
+
+          // Extension context が有効かチェック
+          if (!chrome.runtime?.id) {
+            console.error("ChronoClip: Extension context invalidated");
+            showToast(
+              "error",
+              "拡張機能が無効になっています。ページをリロードしてください。"
+            );
+            hideQuickAddPopup();
+            return;
+          }
 
           chrome.runtime.sendMessage(
             {
@@ -416,10 +768,14 @@ const ignoreSelectors = [
               }
 
               if (response && response.ok) {
-                showToast("success", `予定「${eventPayload.summary}」を追加しました。`);
+                showToast(
+                  "success",
+                  `予定「${eventPayload.summary}」を追加しました。`
+                );
               } else {
                 const errorMessage =
-                  response?.message || "不明なエラーで予定の追加に失敗しました。";
+                  response?.message ||
+                  "不明なエラーで予定の追加に失敗しました。";
                 showToast("error", `エラー: ${errorMessage}`);
               }
             }
@@ -465,6 +821,11 @@ const ignoreSelectors = [
    * ページ全体を走査して日付を検出・処理します。
    */
   function findAndHighlightDates() {
+    console.log("ChronoClip: Starting date highlighting...");
+
+    // 処理開始時間を記録（パフォーマンス監視）
+    const startTime = performance.now();
+
     // 既に処理済みの要素を避けるためのセレクタ
     const ignoreSelectors = [
       "script",
@@ -477,6 +838,7 @@ const ignoreSelectors = [
       "video",
       "audio",
       ".chronoclip-date", // 既に処理済みの要素
+      ".chronoclip-ignore", // トーストなどの無視すべき要素
       '[contenteditable="true"]', // 編集可能な要素
       "input",
       "textarea",
@@ -492,14 +854,21 @@ const ignoreSelectors = [
           let currentNode = node.parentNode;
           while (currentNode && currentNode !== document.body) {
             if (
-              ignoreSelectors.some((selector) => currentNode.matches(selector))
+              ignoreSelectors.some(
+                (selector) =>
+                  currentNode.matches && currentNode.matches(selector)
+              )
             ) {
               return NodeFilter.FILTER_REJECT;
             }
             currentNode = currentNode.parentNode;
           }
-          // 空白のみのテキストノードはスキップ
-          if (node.nodeValue.trim() === "") {
+          // 空白のみまたは短すぎるテキストノードはスキップ
+          if (
+            !node.nodeValue ||
+            node.nodeValue.trim() === "" ||
+            node.nodeValue.length < 5
+          ) {
             return NodeFilter.FILTER_REJECT;
           }
           return NodeFilter.FILTER_ACCEPT;
@@ -510,21 +879,61 @@ const ignoreSelectors = [
 
     const textNodesToProcess = [];
     let currentNode = treeWalker.nextNode();
-    while (currentNode) {
+    let nodeCount = 0;
+
+    // 処理するノード数を制限（大きなページでの過負荷を防ぐ）
+    while (currentNode && nodeCount < 500) {
       textNodesToProcess.push(currentNode);
       currentNode = treeWalker.nextNode();
+      nodeCount++;
     }
 
-    // 収集したテキストノードを処理
-    textNodesToProcess.forEach((node) => {
-      try {
-        processTextNode(node);
-      } catch (e) {
-        console.error("ChronoClip: Error processing text node:", node, e);
-      }
-    });
+    if (nodeCount >= 500) {
+      console.warn(
+        "ChronoClip: Large page detected, limiting processing to 500 nodes"
+      );
+    }
 
-    console.log("ChronoClip: Date highlighting complete.");
+    // 収集したテキストノードを処理（バッチ処理で分割）
+    let processedCount = 0;
+    const batchSize = 50;
+
+    function processBatch() {
+      const endIndex = Math.min(
+        processedCount + batchSize,
+        textNodesToProcess.length
+      );
+
+      for (let i = processedCount; i < endIndex; i++) {
+        try {
+          processTextNode(textNodesToProcess[i]);
+          performanceMonitor.processedNodes++;
+        } catch (e) {
+          console.error(
+            "ChronoClip: Error processing text node:",
+            textNodesToProcess[i],
+            e
+          );
+        }
+      }
+
+      processedCount = endIndex;
+
+      if (processedCount < textNodesToProcess.length) {
+        // 次のバッチを非同期で処理（UIブロッキングを防ぐ）
+        setTimeout(processBatch, 10);
+      } else {
+        const endTime = performance.now();
+        console.log(
+          `ChronoClip: Date highlighting complete. Processed ${processedCount} nodes in ${(
+            endTime - startTime
+          ).toFixed(2)}ms`
+        );
+      }
+    }
+
+    // 最初のバッチを開始
+    processBatch();
   }
 
   // DOMContentLoadedイベントを待ってから処理を開始
@@ -534,59 +943,141 @@ const ignoreSelectors = [
     findAndHighlightDates();
   }
 
-  // MutationObserverで動的に追加されるコンテンツに対応
+  // MutationObserverで動的に追加されるコンテンツに対応（デバウンス付き）
+  let mutationTimeout = null;
+  let pendingMutations = [];
+
   const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.addedNodes.length > 0) {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            // 追加された要素内のテキストノードを再走査
-            const treeWalker = document.createTreeWalker(
-              node,
-              NodeFilter.SHOW_TEXT,
-              {
-                acceptNode: function (n) {
-                  // 既に処理済みの要素や無視リストに含まれる要素はスキップ
-                  let currentNode = n.parentNode;
-                  while (currentNode && currentNode !== node) {
+    // 小さな変更は無視（フォーカス変更、スタイル変更など）
+    const significantMutations = mutations.filter((mutation) => {
+      return (
+        mutation.addedNodes.length > 0 &&
+        Array.from(mutation.addedNodes).some(
+          (node) =>
+            node.nodeType === Node.ELEMENT_NODE &&
+            node.textContent &&
+            node.textContent.trim().length > 10
+        )
+      );
+    });
+
+    if (significantMutations.length === 0) return;
+
+    // SPA対応: 大きな変更（ページ全体の書き換えなど）を検出
+    const hasMajorChanges = significantMutations.some((mutation) => {
+      return Array.from(mutation.addedNodes).some(
+        (node) =>
+          node.nodeType === Node.ELEMENT_NODE &&
+          (node.textContent.length > 5000 || // 大量のテキスト
+            node.querySelectorAll("*").length > 50) // 多数の子要素
+      );
+    });
+
+    pendingMutations.push(...significantMutations);
+
+    // デバウンス処理：SPA変更は長めに待つ
+    const debounceTime = hasMajorChanges ? 1500 : 500;
+
+    if (mutationTimeout) {
+      clearTimeout(mutationTimeout);
+    }
+
+    mutationTimeout = setTimeout(() => {
+      console.log(
+        `ChronoClip: Processing ${pendingMutations.length} mutations${
+          hasMajorChanges ? " (major changes detected)" : ""
+        }`
+      );
+
+      if (hasMajorChanges) {
+        // 大きな変更の場合は、ページ全体を再スキャン
+        console.log(
+          "ChronoClip: Major page changes detected, re-scanning entire page..."
+        );
+        setTimeout(() => {
+          findAndHighlightDates();
+        }, 100);
+      } else {
+        // 小さな変更の場合は部分的に処理
+        pendingMutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // 小さなノードは処理をスキップ
+              if (node.textContent && node.textContent.length < 20) return;
+
+              // 既に処理済みかチェック
+              if (node.querySelector(".chronoclip-date")) return;
+
+              // 追加された要素内のテキストノードを再走査
+              const treeWalker = document.createTreeWalker(
+                node,
+                NodeFilter.SHOW_TEXT,
+                {
+                  acceptNode: function (n) {
+                    // 既に処理済みの要素や無視リストに含まれる要素はスキップ
+                    let currentNode = n.parentNode;
+                    while (currentNode && currentNode !== node) {
+                      if (
+                        ignoreSelectors.some(
+                          (selector) =>
+                            currentNode.matches && currentNode.matches(selector)
+                        )
+                      ) {
+                        return NodeFilter.FILTER_REJECT;
+                      }
+                      currentNode = currentNode.parentNode;
+                    }
                     if (
-                      ignoreSelectors.some((selector) =>
-                        currentNode.matches(selector)
-                      )
+                      !n.nodeValue ||
+                      n.nodeValue.trim() === "" ||
+                      n.nodeValue.length < 5
                     ) {
                       return NodeFilter.FILTER_REJECT;
                     }
-                    currentNode = currentNode.parentNode;
-                  }
-                  if (n.nodeValue.trim() === "") {
-                    return NodeFilter.FILTER_REJECT;
-                  }
-                  return NodeFilter.FILTER_ACCEPT;
+                    return NodeFilter.FILTER_ACCEPT;
+                  },
                 },
-              },
-              false
-            );
-            let currentNode = treeWalker.nextNode();
-            while (currentNode) {
-              try {
-                processTextNode(currentNode);
-              } catch (e) {
-                console.error(
-                  "ChronoClip: Error processing dynamically added node:",
-                  currentNode,
-                  e
-                );
+                false
+              );
+
+              let processedCount = 0;
+              let currentNode = treeWalker.nextNode();
+              while (currentNode && processedCount < 20) {
+                // SPAでは最大20ノードまで
+                try {
+                  processTextNode(currentNode);
+                  processedCount++;
+                } catch (e) {
+                  console.error(
+                    "ChronoClip: Error processing dynamically added node:",
+                    currentNode,
+                    e
+                  );
+                }
+                currentNode = treeWalker.nextNode();
               }
-              currentNode = treeWalker.nextNode();
             }
-          }
+          });
         });
       }
-    });
+
+      pendingMutations = [];
+      mutationTimeout = null;
+    }, debounceTime);
   });
 
   // body要素とその子孫の変更を監視
   observer.observe(document.body, { childList: true, subtree: true });
+
+  // パフォーマンス情報を定期的に出力
+  setInterval(() => {
+    if (
+      performanceMonitor.processedNodes > 0 ||
+      performanceMonitor.extractionCalls > 0
+    ) {
+      performanceMonitor.log();
+    }
+  }, 30000); // 30秒ごと
 })();
 
 /**
@@ -607,7 +1098,13 @@ function showToast(type, message) {
   // トースト要素を作成
   const toast = document.createElement("div");
   toast.className = `chronoclip-toast chronoclip-toast-${type}`;
-  toast.textContent = message;
+
+  // ハイライト処理を避けるため、特別なクラスを追加
+  toast.classList.add("chronoclip-ignore");
+
+  // HTMLタグを除去してプレーンテキストとして表示
+  const cleanMessage = message.replace(/<[^>]*>/g, "");
+  toast.textContent = cleanMessage;
 
   // ページに追加
   document.body.appendChild(toast);
