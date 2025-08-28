@@ -268,7 +268,34 @@
           let currentNode = node.parentNode;
           while (currentNode && currentNode !== document.body) {
             if (ignoreSelectors.some(selector => currentNode.matches(selector))) {
-              return NodeFilter.FILTER_REJECT;
+  function createAcceptNode(rootNode) {
+    return function(node) {
+      // 親要素が無視リストに含まれる場合はスキップ
+      let currentNode = node.parentNode;
+      while (currentNode && currentNode !== rootNode) {
+        if (ignoreSelectors.some(selector => currentNode.matches(selector))) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        currentNode = currentNode.parentNode;
+      }
+      // 空白のみのテキストノードはスキップ
+      if (node.nodeValue.trim() === '') {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  }
+
+  /**
+   * ページ全体を走査して日付を検出・処理します。
+   */
+  function findAndHighlightDates() {
+    const treeWalker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      { acceptNode: createAcceptNode(document.body) },
+      false
+    );
             }
             currentNode = currentNode.parentNode;
           }
