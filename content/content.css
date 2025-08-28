@@ -1,0 +1,36 @@
+/* content/content.css */
+
+.chronoclip-date {
+  position: relative;
+  background-color: rgba(255, 235, 59, 0.3); /* 薄い黄色の背景 */
+  border-bottom: 2px solid rgba(255, 193, 7, 0.5); /* 少し濃い黄色の下線 */
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: inline;
+  padding: 1px 0;
+}
+
+.chronoclip-date:hover {
+  background-color: rgba(255, 235, 59, 0.6); /* ホバー時、背景を濃くする */
+  border-bottom-color: rgba(255, 193, 7, 1);
+}
+
+.chronoclip-date .chronoclip-icon {
+  display: none; /* 通常はアイコンを非表示 */
+  position: absolute;
+  top: -20px; /* 日付の上に表示 */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 18px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 2px;
+  z-index: 9999;
+}
+
+.chronoclip-date:hover .chronoclip-icon {
+  display: inline-block; /* ホバー時にアイコンを表示 */
+}

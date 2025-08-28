@@ -19,7 +19,8 @@
         "lib/date-utils.js",
         "lib/chrono.min.js",
         "content/content-script.js"
-      ]
+      ],
+      "css": ["content/content.css"]
     }
   ],
   "action": {
