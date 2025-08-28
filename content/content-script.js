@@ -247,7 +247,18 @@
       '[contenteditable="true"]', // 編集可能な要素
       'input', 'textarea', 'select' // フォーム要素
     ];
+  const ignoreSelectors = [
+    'script', 'style', 'noscript', 'iframe', 'canvas', 'svg', 'img', 'video', 'audio',
+    '.chronoclip-date', // 既に処理済みの要素
+    '[contenteditable="true"]', // 編集可能な要素
+    'input', 'textarea', 'select' // フォーム要素
+  ];
 
+  /**
+   * ページ全体を走査して日付を検出・処理します。
+   */
+  function findAndHighlightDates() {
+    // 既に処理済みの要素を避けるためのセレクタ
     const treeWalker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
