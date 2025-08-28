@@ -1,118 +1,146 @@
 .chronoclip-quick-add-popup {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-    border: 1px solid #ccc;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    background-color: #fff;
-    padding: 15px;
-    z-index: 99999; /* Ensure it's on top */
-    position: absolute;
-    width: 300px;
-    max-width: 90vw; /* Responsive for mobile */
-    box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  background-color: #fff;
+  padding: 15px;
+  z-index: 99999; /* Ensure it's on top */
+  position: absolute;
+  width: 300px;
+  max-width: 90vw; /* Responsive for mobile */
+  box-sizing: border-box;
 }
 
 .chronoclip-quick-add-popup .popup-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
 }
 
 .chronoclip-quick-add-popup .popup-header h3 {
-    margin: 0;
-    font-size: 1.1em;
-    color: #333;
+  margin: 0;
+  font-size: 1.1em;
+  color: #333;
 }
 
 .chronoclip-quick-add-popup .close-button {
-    background: none;
-    border: none;
-    font-size: 1.5em;
-    cursor: pointer;
-    color: #888;
-    padding: 0 5px;
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: #888;
+  padding: 0 5px;
 }
 
 .chronoclip-quick-add-popup .close-button:hover {
-    color: #333;
+  color: #333;
 }
 
 .chronoclip-quick-add-popup .form-group {
-    margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 
 .chronoclip-quick-add-popup label {
-    display: block;
-    margin-bottom: 5px;
-    font-size: 0.9em;
-    color: #555;
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.9em;
+  color: #555;
 }
 
 .chronoclip-quick-add-popup input[type="text"],
+.chronoclip-quick-add-popup input[type="time"],
 .chronoclip-quick-add-popup textarea {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-sizing: border-box;
-    font-size: 0.9em;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 0.9em;
 }
 
 .chronoclip-quick-add-popup input[type="text"]:focus,
+.chronoclip-quick-add-popup input[type="time"]:focus,
 .chronoclip-quick-add-popup textarea:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.chronoclip-quick-add-popup .time-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.chronoclip-quick-add-popup .time-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chronoclip-quick-add-popup .time-input-group label {
+  margin-bottom: 0;
+  min-width: 40px;
+}
+
+.chronoclip-quick-add-popup #event-time {
+  flex: 1;
+}
+
+.chronoclip-quick-add-popup #event-time.hidden {
+  display: none;
 }
 
 .chronoclip-quick-add-popup textarea {
-    resize: vertical;
-    min-height: 60px;
+  resize: vertical;
+  min-height: 60px;
 }
 
 .chronoclip-quick-add-popup .button-group {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 15px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
 }
 
 .chronoclip-quick-add-popup .add-button,
 .chronoclip-quick-add-popup .cancel-button {
-    padding: 8px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-    transition: background-color 0.2s ease;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s ease;
 }
 
 .chronoclip-quick-add-popup .add-button {
-    background-color: #007bff;
-    color: white;
+  background-color: #007bff;
+  color: white;
 }
 
 .chronoclip-quick-add-popup .add-button:hover {
-    background-color: #0056b3;
+  background-color: #0056b3;
 }
 
 .chronoclip-quick-add-popup .cancel-button {
-    background-color: #6c757d;
-    color: white;
+  background-color: #6c757d;
+  color: white;
 }
 
 .chronoclip-quick-add-popup .cancel-button:hover {
-    background-color: #5a6268;
+  background-color: #5a6268;
 }
 
 /* Responsive adjustments */
 @media (max-width: 600px) {
-    .chronoclip-quick-add-popup {
-        width: 95vw;
-        left: 2.5vw !important; /* Center on smaller screens */
-        right: 2.5vw !important;
-    }
+  .chronoclip-quick-add-popup {
+    width: 95vw;
+    left: 2.5vw !important; /* Center on smaller screens */
+    right: 2.5vw !important;
+  }
 }

@@ -69,6 +69,35 @@ const DEFAULT_STOPWORDS_JA = [
   "Español",
   "Italiano",
   "Português",
+  // ナビゲーション関連
+  "スケジュール",
+  "チケット",
+  "チケット情報",
+  "予約",
+  "購入",
+  "申し込み",
+  "詳細",
+  "詳細情報",
+  "一覧",
+  "リスト",
+  "カレンダー",
+  "Calendar",
+  "Schedule",
+  "Ticket",
+  "Tickets",
+  "Information",
+  "Info",
+  "Details",
+  "List",
+  "More",
+  "View",
+  "すべて",
+  "全て",
+  "もっと見る",
+  "続きを読む",
+  "Read More",
+  "View All",
+  "See More",
 ];
 
 /**
@@ -152,14 +181,49 @@ function findNearestHeading(element, maxDepth = 3) {
   let depth = 0;
 
   while (currentElement && depth < maxDepth) {
-    // 同じレベルで見出しを探す
+    // 現在の要素とその兄弟から見出しを探す
+    const parent = currentElement.parentElement;
+    if (parent) {
+      // まず、特定のイベント関連セレクターで検索
+      const eventSelectors = [
+        "h1, h2, h3, h4, h5, h6",
+        '[role="heading"]',
+        ".title, .heading",
+        ".event-title, .schedule-title, .match-title, .tournament-title",
+        ".card-title, .item-title",
+        '[class*="title"], [class*="heading"]',
+        "[data-title]",
+      ];
+
+      for (const selector of eventSelectors) {
+        const headings = parent.querySelectorAll(selector);
+        for (let heading of headings) {
+          const text = normalizeText(heading.textContent);
+          if (text.length >= 3 && text.length <= 200) {
+            // 日付要素の位置と見出しの位置関係を確認
+            const headingPos = heading.compareDocumentPosition(element);
+
+            // 見出しが日付より前にある、または同じコンテナ内にある場合
+            if (
+              headingPos & Node.DOCUMENT_POSITION_FOLLOWING ||
+              headingPos & Node.DOCUMENT_POSITION_PRECEDING ||
+              headingPos === 0
+            ) {
+              return heading;
+            }
+          }
+        }
+      }
+    }
+
+    // 同じレベルで汎用的に見出しを探す
     const headings = currentElement.querySelectorAll(
       'h1, h2, h3, h4, h5, h6, [role="heading"], [class*="title"], [class*="heading"]'
     );
 
     for (let heading of headings) {
       const text = normalizeText(heading.textContent);
-      if (text.length >= 3 && text.length <= 100) {
+      if (text.length >= 3 && text.length <= 200) {
         return heading;
       }
     }
@@ -169,24 +233,38 @@ function findNearestHeading(element, maxDepth = 3) {
     depth++;
   }
 
-  // 上方向に向かって見出しを探す
-  let walker = element;
-  while (walker && walker !== document.body) {
-    walker = walker.parentElement;
-    if (!walker) break;
+  // より広範囲でコンテナレベルの見出しを探す
+  const containers = [
+    element.closest("article"),
+    element.closest("section"),
+    element.closest(".event"),
+    element.closest(".schedule-item"),
+    element.closest(".match"),
+    element.closest(".card"),
+    element.closest(".item"),
+    element.closest('[class*="event"]'),
+    element.closest('[class*="schedule"]'),
+    element.closest('[class*="match"]'),
+  ].filter(Boolean);
 
-    const headings = walker.querySelectorAll("h1, h2, h3, h4, h5, h6");
-    for (let heading of headings) {
-      // 要素が見出しより後に来る場合のみ採用
-      if (
-        walker.compareDocumentPosition(element) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-      ) {
-        const text = normalizeText(heading.textContent);
-        if (text.length >= 3 && text.length <= 100) {
-          return heading;
-        }
+  for (const container of containers) {
+    const heading = container.querySelector(
+      "h1, h2, h3, h4, h5, h6, .title, .heading, .event-title, .schedule-title, .match-title"
+    );
+    if (heading) {
+      const text = normalizeText(heading.textContent);
+      if (text.length >= 3 && text.length <= 200) {
+        return heading;
       }
+    }
+  }
+
+  // 最後の手段：ページタイトルに近い要素
+  const pageHeadings = document.querySelectorAll("h1");
+  if (pageHeadings.length > 0) {
+    const text = normalizeText(pageHeadings[0].textContent);
+    if (text.length >= 3 && text.length <= 200) {
+      return pageHeadings[0];
     }
   }
 
@@ -294,19 +372,114 @@ function scoreTitleCandidate(text, source) {
   // テキストの品質による調整
   const normalizedText = normalizeText(text);
 
-  // 長すぎるor短すぎる場合は減点
-  if (normalizedText.length < 3 || normalizedText.length > 100) {
+  // 理想的な長さの場合は加点（10-50文字）
+  if (normalizedText.length >= 10 && normalizedText.length <= 50) {
+    score += 0.2;
+  } else if (normalizedText.length >= 5 && normalizedText.length <= 100) {
+    score += 0.1;
+  } else if (normalizedText.length < 3 || normalizedText.length > 200) {
+    score -= 0.3;
+  }
+
+  // イベント関連のキーワードがある場合は加点
+  const eventKeywords = [
+    "大会",
+    "試合",
+    "興行",
+    "フェス",
+    "コンサート",
+    "イベント",
+    "セミナー",
+    "会議",
+    "ライブ",
+    "ショー",
+    "発表",
+    "展示",
+    "祭り",
+    "祭",
+    "フェア",
+    "コンペ",
+    "カップ",
+    "リーグ",
+    "トーナメント",
+    "選手権",
+    "チャンピオン",
+    "バトル",
+    "マッチ",
+    "Conference",
+    "Live",
+    "Show",
+    "Event",
+    "Match",
+    "Battle",
+    "Tournament",
+    "記念",
+    "周年",
+    "Special",
+    "Premium",
+    "Deluxe",
+    "Final",
+  ];
+
+  for (const keyword of eventKeywords) {
+    if (normalizedText.includes(keyword)) {
+      score += 0.15;
+      break; // 複数ヒットしても一度だけ加点
+    }
+  }
+
+  // 年月日が含まれている場合は減点（タイトルではなく日付情報の可能性）
+  if (/\d{4}[年\/\-]\d{1,2}[月\/\-]\d{1,2}/.test(normalizedText)) {
     score -= 0.2;
   }
 
-  // 英数字のみの場合は減点
-  if (/^[a-zA-Z0-9\s]+$/.test(normalizedText)) {
-    score -= 0.2;
+  // ナビゲーション用語の場合は大幅減点
+  const navKeywords = [
+    "ナビゲーション",
+    "メニュー",
+    "ヘッダー",
+    "フッター",
+    "サイドバー",
+    "ログイン",
+    "検索",
+    "トップページ",
+    "ホーム",
+    "戻る",
+    "次へ",
+    "前へ",
+    "Navigation",
+    "Menu",
+    "Header",
+    "Footer",
+    "Sidebar",
+    "Login",
+    "Search",
+  ];
+
+  for (const keyword of navKeywords) {
+    if (normalizedText.includes(keyword)) {
+      score -= 0.4;
+      break;
+    }
   }
 
-  // 自然な終端がある場合は加点
+  // 英数字のみの場合は少し減点
+  if (
+    /^[a-zA-Z0-9\s\-_]+$/.test(normalizedText) &&
+    normalizedText.length < 20
+  ) {
+    score -= 0.1;
+  }
+
+  // 自然な文の終端がある場合は加点
   if (/[。.!?]$/.test(normalizedText)) {
     score += 0.1;
+  }
+
+  // 大文字が多すぎる場合は減点
+  const upperCount = (normalizedText.match(/[A-Z]/g) || []).length;
+  if (upperCount > normalizedText.length * 0.5) {
+    score -= 0.1;
   }
 
   return Math.max(0, Math.min(1, score));
@@ -389,23 +562,46 @@ function extractEventContext(dateElement, options = {}) {
     }
 
     // 2. 同階層の強調テキスト
-    const parent = dateElement.closest("article, section, div, li, p");
+    const parent = dateElement.closest(
+      "article, section, div, li, p, .event, .schedule-item, .match, .card"
+    );
     if (parent) {
-      const emphasisElements = parent.querySelectorAll(
-        "strong, b, em, mark, .title, .heading"
-      );
-      for (let elem of emphasisElements) {
-        const emphasisText = normalizeText(elem.textContent);
-        if (emphasisText && isValidText(emphasisText, opts.stopwords)) {
-          const compressed = compressJapaneseText(emphasisText);
-          const titleText =
-            typeof compressed === "object" ? compressed.title : compressed;
+      const emphasisSelectors = [
+        "strong, b, em, mark",
+        ".title, .heading",
+        ".event-title, .schedule-title, .match-title, .tournament-title",
+        ".card-title, .item-title",
+        "[class*='title'], [class*='heading']",
+        "a[class*='title'], a[class*='link']",
+        ".name, .event-name",
+      ];
 
-          titleCandidates.push({
-            text: titleText,
-            score: scoreTitleCandidate(titleText, "emphasis"),
-            source: getCssPath(elem),
-          });
+      for (const selector of emphasisSelectors) {
+        const emphasisElements = parent.querySelectorAll(selector);
+        for (let elem of emphasisElements) {
+          const emphasisText = normalizeText(elem.textContent);
+          if (emphasisText && isValidText(emphasisText, opts.stopwords)) {
+            const compressed = compressJapaneseText(emphasisText);
+            const titleText =
+              typeof compressed === "object" ? compressed.title : compressed;
+
+            // 日付要素と近い場合はスコアを上げる
+            let baseScore = scoreTitleCandidate(titleText, "emphasis");
+            const distance = Math.abs(
+              elem.getBoundingClientRect().top -
+                dateElement.getBoundingClientRect().top
+            );
+            if (distance < 100) {
+              // 100px以内の場合
+              baseScore += 0.1;
+            }
+
+            titleCandidates.push({
+              text: titleText,
+              score: Math.min(1, baseScore),
+              source: getCssPath(elem),
+            });
+          }
         }
       }
     }
