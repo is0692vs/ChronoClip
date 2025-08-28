@@ -1,3 +1,4 @@
+importScripts("../lib/calendar.js");
 // background/service-worker.js
 
 console.log("ChronoClip Service Worker loaded.");
@@ -8,198 +9,216 @@ console.log("ChronoClip Service Worker loaded.");
  * データの保存や他のChrome APIとの対話などのバックグラウンドタスクを実行できます。
  */
 
-const USER_INFO_API_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
-const REVOKE_TOKEN_URL = 'https://accounts.google.com/o/oauth2/revoke';
-const STORAGE_KEY_ACCESS_TOKEN = 'googleAccessToken';
-const STORAGE_KEY_USER_INFO = 'googleUserInfo';
+const USER_INFO_API_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
+const REVOKE_TOKEN_URL = "https://accounts.google.com/o/oauth2/revoke";
+const STORAGE_KEY_ACCESS_TOKEN = "googleAccessToken";
+const STORAGE_KEY_USER_INFO = "googleUserInfo";
 
 /**
- * Google APIからユーザー情報を取得します。
- * @param {string} accessToken - Googleアクセストークン
- * @returns {Promise<Object|null>} ユーザー情報オブジェクト、またはエラーの場合はnull
+ * アクセストークンを使い、Googleからユーザー情報を取得します。
+ * @param {string} token - OAuthアクセストークン
+ * @returns {Promise<object>} ユーザー情報のオブジェクト
  */
-async function fetchUserInfo(accessToken) {
-  try {
-    const response = await fetch(USER_INFO_API_URL, {
+async function fetchUserInfo(token) {
+  const response = await fetch(
+    "https://www.googleapis.com/oauth2/v3/userinfo",
+    {
       headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-    if (!response.ok) {
-      console.error('Failed to fetch user info:', response.statusText);
-      return null;
+        Authorization: `Bearer ${token}`,
+      },
     }
-    const userInfo = await response.json();
-    console.log('User Info:', userInfo);
-    return userInfo;
-  } catch (error) {
-    console.error('Error fetching user info:', error);
-    return null;
-  }
+  );
+  return await response.json();
 }
-
-/**
- * Google OAuth2.0認証フローを開始し、アクセストークンを取得します。
- * @param {boolean} interactive - ユーザーに同意画面を表示するかどうか
- * @returns {Promise<{accessToken: string, userInfo: Object}|null>} アクセストークンとユーザー情報、または認証失敗の場合はnull
- */
-async function getAuthToken(interactive) {
-  return new Promise((resolve) => {
-    chrome.identity.getAuthToken({ interactive: interactive }, async (token) => {
-      if (chrome.runtime.lastError || !token) {
-        console.error('Authentication failed:', chrome.runtime.lastError?.message || 'No token received.');
-        resolve(null);
-        return;
-      }
-
-      console.log('Access Token obtained:', token);
-      const userInfo = await fetchUserInfo(token);
-
-      if (userInfo) {
-        await chrome.storage.local.set({
-          [STORAGE_KEY_ACCESS_TOKEN]: token,
-          [STORAGE_KEY_USER_INFO]: userInfo
-        });
-        console.log('Token and user info saved to storage.');
-        resolve({ accessToken: token, userInfo: userInfo });
-      } else {
-        console.error('Failed to get user info after token acquisition.');
-        resolve(null);
-      }
-    });
-  });
-}
-
-/**
- * 認証トークンを削除し、Google側でも無効化します。
- * @param {string} accessToken - 削除するアクセストークン
- * @returns {Promise<boolean>} 成功した場合はtrue、失敗した場合はfalse
- */
-async function removeAuthToken(accessToken) {
-  try {
-    // Chromeのキャッシュからトークンを削除
-    chrome.identity.removeCachedAuthToken({ token: accessToken }, () => {
-      if (chrome.runtime.lastError) {
-        console.warn('Failed to remove cached token:', chrome.runtime.lastError.message);
-      } else {
-        console.log('Cached token removed from Chrome.');
-      }
-    });
-
-    // Google側でトークンを無効化
-    const revokeResponse = await fetch(`${REVOKE_TOKEN_URL}?token=${accessToken}`);
-    if (!revokeResponse.ok) {
-      console.error('Failed to revoke token on Google side:', revokeResponse.statusText);
-      return false;
-    }
-    console.log('Token successfully revoked on Google side.');
-
-    // ローカルストレージからトークンとユーザー情報を削除
-    await chrome.storage.local.remove([STORAGE_KEY_ACCESS_TOKEN, STORAGE_KEY_USER_INFO]);
-    console.log('Token and user info removed from local storage.');
-    return true;
-  } catch (error) {
-    console.error('Error during token removal:', error);
-    return false;
-  }
-}
-
-/**
- * 現在の認証状態をチェックします。
- * @returns {Promise<{loggedIn: boolean, userInfo: Object|null}>} 認証状態とユーザー情報
- */
-async function checkAuthStatus() {
-  const storedToken = (await chrome.storage.local.get(STORAGE_KEY_ACCESS_TOKEN))[STORAGE_KEY_ACCESS_TOKEN];
-  const storedUserInfo = (await chrome.storage.local.get(STORAGE_KEY_USER_INFO))[STORAGE_KEY_USER_INFO];
-
-  if (storedToken && storedUserInfo) {
-    // トークンがストレージに存在する場合、有効性を確認するために非対話的に取得を試みる
-    return new Promise((resolve) => {
-      chrome.identity.getAuthToken({ interactive: false }, async (token) => {
-        if (chrome.runtime.lastError || !token) {
-          console.log('Stored token is invalid or expired, attempting re-auth if needed.');
-          await chrome.storage.local.remove([STORAGE_KEY_ACCESS_TOKEN, STORAGE_KEY_USER_INFO]);
-          resolve({ loggedIn: false, userInfo: null });
-          return;
-        }
-        // トークンが有効であれば、ユーザー情報も有効とみなす
-        console.log('User is already authenticated with a valid token.');
-        resolve({ loggedIn: true, userInfo: storedUserInfo });
-      });
-    });
-  } else {
-    console.log('No stored token or user info found.');
-    return { loggedIn: false, userInfo: null };
-  }
-}
-
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("ChronoClip: Message received in service worker.", message);
 
   switch (message.type) {
     case "content_script_loaded":
-      console.log("ChronoClip: Content script loaded on:", message.payload.url);
-      sendResponse({ status: "Message received successfully" });
+      // ...
       break;
 
     case "dates_found":
-      console.log("ChronoClip: Received dates from content script.", message.payload);
-      const { url, dates } = message.payload;
-      chrome.storage.local.set({ [url]: dates }, () => {
-        console.log(`ChronoClip: Saved ${dates.length} dates for ${url}.`);
-      });
-      sendResponse({ status: "Dates received and saved." });
+      // ...
       break;
 
-    // --- Google OAuth 関連の新しいメッセージハンドラ ---
     case "auth_login":
-      console.log("ChronoClip: Attempting Google login...");
-      getAuthToken(true) // interactive: true で同意画面を表示
-        .then(authResult => {
-          if (authResult) {
-            sendResponse({ success: true, userInfo: authResult.userInfo });
-          } else {
-            sendResponse({ success: false, error: "Authentication failed." });
-          }
-        })
-        .catch(error => {
-          console.error("Login error:", error);
-          sendResponse({ success: false, error: error.message });
-        });
-      break;
-
-    case "auth_logout":
-      console.log("ChronoClip: Attempting Google logout...");
-      chrome.storage.local.get(STORAGE_KEY_ACCESS_TOKEN, async (data) => {
-        const accessToken = data[STORAGE_KEY_ACCESS_TOKEN];
-        if (accessToken) {
-          const success = await removeAuthToken(accessToken);
-          sendResponse({ success: success });
+      chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+        if (chrome.runtime.lastError || !token) {
+          sendResponse({
+            success: false,
+            error: chrome.runtime.lastError?.message,
+          });
         } else {
-          console.log("No access token found to logout.");
-          sendResponse({ success: true }); // Already logged out or no token
+          // ログイン成功後、ユーザー情報を取得して返す
+          const userInfo = await fetchUserInfo(token);
+          sendResponse({ success: true, userInfo: userInfo });
         }
       });
-      break;
+      break; // caseを終了
+
+    case "auth_logout":
+      chrome.identity.getAuthToken({ interactive: false }, (token) => {
+        if (token) {
+          // Google側の認証を無効化
+          fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`);
+          // 拡張機能のキャッシュからトークンを削除
+          chrome.identity.removeCachedAuthToken({ token: token }, () => {
+            sendResponse({ success: true });
+          });
+        } else {
+          sendResponse({ success: false, error: "No token to logout." });
+        }
+      });
+      break; // caseを終了
 
     case "auth_check_status":
-      console.log("ChronoClip: Checking Google auth status...");
-      checkAuthStatus()
-        .then(status => {
-          sendResponse(status);
+      chrome.identity.getAuthToken({ interactive: false }, async (token) => {
+        if (chrome.runtime.lastError || !token) {
+          sendResponse({ loggedIn: false });
+        } else {
+          // ログイン済みの場合、ユーザー情報を取得して返す
+          const userInfo = await fetchUserInfo(token);
+          sendResponse({ loggedIn: true, userInfo: userInfo });
+        }
+      });
+      break; // caseを終了
+
+    case "calendar:createEvent":
+      console.log("ChronoClip: Received calendar:createEvent", message.payload);
+      createEvent(message.payload)
+        .then((event) => {
+          showNotification(
+            "success",
+            "イベントを追加しました",
+            event.summary,
+            event.htmlLink
+          );
+          sendResponse({
+            ok: true,
+            eventId: event.id,
+            htmlLink: event.htmlLink,
+          });
         })
-        .catch(error => {
-          console.error("Check auth status error:", error);
-          sendResponse({ loggedIn: false, userInfo: null, error: error.message });
+        .catch((err) => {
+          console.error("Failed to create event:", err);
+          const errorMessage = getErrorMessage(err);
+          showNotification(
+            "error",
+            "イベントの追加に失敗しました",
+            errorMessage
+          );
+          sendResponse({ ok: false, code: err.code, message: errorMessage });
         });
       break;
 
     default:
-      console.warn("ChronoClip: Received an unknown message type:", message.type);
+      console.warn(
+        "ChronoClip: Received an unknown message type:",
+        message.type
+      );
       sendResponse({ status: "Unknown message type" });
       break;
   }
 
-  return true; // 非同期応答を示す
+  return true; // Indicate asynchronous response
+});
+
+/**
+ * Shows a notification to the user.
+ * @param {'success' | 'error'} type - The type of notification.
+ * @param {string} title - The notification title.
+ * @param {string} message - The notification message.
+ * @param {string} [linkUrl] - An optional URL to open when the notification is clicked.
+ */
+function showNotification(type, title, message, linkUrl) {
+  const notificationId = `chronoclip-notification-${Date.now()}`;
+  const iconUrl = type === "success" ? "icons/icon128.png" : "icons/icon48.png"; // Use different icons for feedback
+
+  chrome.notifications.create(notificationId, {
+    type: "basic",
+    iconUrl: iconUrl,
+    title: title,
+    message: message,
+    priority: 2,
+  });
+
+  if (linkUrl) {
+    const clickListener = (id) => {
+      if (id === notificationId) {
+        chrome.tabs.create({ url: linkUrl });
+        chrome.notifications.clear(id);
+        chrome.notifications.onClicked.removeListener(clickListener);
+      }
+    };
+    chrome.notifications.onClicked.addListener(clickListener);
+  }
+}
+
+/**
+ * Converts an error object into a user-friendly error message.
+ * @param {Error} err - The error object, potentially with code and reason properties.
+ * @returns {string} A user-friendly error message.
+ */
+function getErrorMessage(err) {
+  switch (err.code) {
+    case 401:
+      return "Google認証に失敗しました。拡張機能の権限を確認してください。";
+    case 403:
+      if (err.reason === "forbidden") {
+        return "カレンダーの編集権限がありません。OAuth設定を見直してください。";
+      }
+      return "Google Calendar APIへのアクセスが拒否されました。";
+    case 400:
+      return "日付形式が不正です。開始と終了を確認してください。";
+    default:
+      return "Google Calendar APIでエラーが発生しました。しばらくしてから再試行してください。";
+  }
+}
+
+// --- Context Menu for Testing ---
+const CONTEXT_MENU_ID = "chronoclip-test-event";
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: CONTEXT_MENU_ID,
+    title: "ChronoClip: テストイベント追加",
+    contexts: ["page"],
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === CONTEXT_MENU_ID) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const yyyy = tomorrow.getFullYear();
+    const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
+    const dd = String(tomorrow.getDate()).padStart(2, "0");
+    const tomorrowStr = `${yyyy}-${mm}-${dd}`;
+
+    const testEvent = {
+      summary: "ChronoClip Test Event",
+      description: "自動テストイベント",
+      start: { date: tomorrowStr },
+      end: { date: tomorrowStr },
+      url: tab.url,
+    };
+
+    console.log("Creating test event:", testEvent);
+
+    createEvent(testEvent)
+      .then((event) => {
+        showNotification(
+          "success",
+          "テストイベントを追加しました",
+          event.summary,
+          event.htmlLink
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to create test event:", err);
+        const errorMessage = getErrorMessage(err);
+        showNotification("error", "テストイベントの追加に失敗", errorMessage);
+      });
+  }
 });
