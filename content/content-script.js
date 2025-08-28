@@ -384,21 +384,46 @@ const ignoreSelectors = [
           const eventTitle = shadowRoot.getElementById("event-title").value;
           const eventDetails = shadowRoot.getElementById("event-details").value;
 
-          console.log("ChronoClip: Add button clicked!");
-          console.log("Date:", normalizedDate);
-          console.log("Title:", eventTitle);
-          console.log("Details:", eventDetails);
+          if (!eventTitle) {
+            const titleInput = shadowRoot.getElementById("event-title");
+            titleInput.style.border = "1px solid red";
+            titleInput.placeholder = "タイトルは必須です";
+            titleInput.focus();
+            return;
+          }
 
-          // TODO: ここでGoogleカレンダーへの追加処理を実装
-          // chrome.runtime.sendMessage({
-          //   type: "add_event",
-          //   payload: {
-          //     date: normalizedDate,
-          //     title: eventTitle,
-          //     details: eventDetails,
-          //     url: window.location.href,
-          //   },
-          // });
+          const eventPayload = {
+            summary: eventTitle,
+            description: eventDetails,
+            start: { date: normalizedDate },
+            end: { date: normalizedDate },
+            url: window.location.href,
+          };
+
+          chrome.runtime.sendMessage(
+            {
+              type: "calendar:createEvent",
+              payload: eventPayload,
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.error(
+                  "ChronoClip: Message sending failed:",
+                  chrome.runtime.lastError
+                );
+                showToast("error", "カレンダー連携でエラーが発生しました。");
+                return;
+              }
+
+              if (response && response.ok) {
+                showToast("success", `予定「${eventPayload.summary}」を追加しました。`);
+              } else {
+                const errorMessage =
+                  response?.message || "不明なエラーで予定の追加に失敗しました。";
+                showToast("error", `エラー: ${errorMessage}`);
+              }
+            }
+          );
 
           hideQuickAddPopup();
         });
