@@ -124,3 +124,51 @@ ChronoClip はウェブブラウジングをより生産的にし、情報管理
     - `"YOUR_GOOGLE_CLOUD_OAUTH_CLIENT_ID.apps.googleusercontent.com"` の部分を、ステップ 1 で取得したあなた自身のクライアント ID に置き換えます。
     - `"YOUR_GENERATED_EXTENSION_KEY"` の部分を、拡張機能の ID を固定するためのキーに置き換えます。このキーは、一度拡張機能をロードして ID を確認し、その ID からキーを生成するツール（例: [https://www.extensionid.com/](https://www.extensionid.com/)）などを使って生成できます。
 4.  Chrome 拡張機能の管理画面で、このフォルダを「パッケージ化されていない拡張機能」として読み込みます。
+
+## 設定とカスタマイズ
+
+### 設定ファイル
+
+ChronoClip では、`config/constants.js` ファイルで各種定数と設定を管理しています。これにより、アプリケーションの動作を簡単にカスタマイズできます。
+
+#### 主な設定項目
+
+**イベント関連設定**
+
+- `DEFAULT_DURATION_HOURS`: デフォルトのイベント継続時間（デフォルト: 3 時間）
+- `MIN_DURATION_MINUTES`: 最小イベント継続時間（デフォルト: 15 分）
+- `MAX_DURATION_HOURS`: 最大イベント継続時間（デフォルト: 24 時間）
+
+**UI 関連設定**
+
+- `POPUP_Z_INDEX`: ポップアップの z-index 値（デフォルト: 99999）
+- `POPUP_OFFSET`: ポップアップの表示オフセット（デフォルト: 10px）
+- `ANIMATION_DURATION`: アニメーションの持続時間（デフォルト: 200ms）
+
+**パフォーマンス関連設定**
+
+- `MUTATION_DEBOUNCE_MS`: MutationObserver のデバウンス時間（デフォルト: 500ms）
+- `BATCH_SIZE`: バッチ処理のサイズ（デフォルト: 100）
+- `MAX_NODES`: 処理対象の最大ノード数（デフォルト: 1000）
+
+**抽出関連設定**
+
+- `MAX_TITLE_LENGTH`: タイトル抽出の最大文字数（デフォルト: 100）
+- `MAX_DESCRIPTION_LENGTH`: 詳細抽出の最大文字数（デフォルト: 500）
+- `NEARBY_SEARCH_RADIUS`: 近傍検索の範囲（デフォルト: 200px）
+
+#### 設定の変更方法
+
+1. `config/constants.js` ファイルを開く
+2. `window.ChronoClipConfig` オブジェクト内の該当する値を変更
+3. 拡張機能をリロード
+
+例：デフォルトのイベント継続時間を 2 時間に変更する場合：
+
+```javascript
+EVENT: {
+  DEFAULT_DURATION_HOURS: 2,  // 3から2に変更
+  DEFAULT_DURATION_MS: 2 * 60 * 60 * 1000,  // 2時間のミリ秒
+  // その他の設定...
+}
+```

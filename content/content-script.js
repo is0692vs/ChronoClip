@@ -478,7 +478,8 @@ const ignoreSelectors = [
 
     quickAddPopupHost = document.createElement("div");
     quickAddPopupHost.style.position = "absolute";
-    quickAddPopupHost.style.zIndex = "99999"; // 最前面に表示
+    quickAddPopupHost.style.zIndex =
+      window.ChronoClipConfig?.UI?.POPUP_Z_INDEX || "99999"; // 最前面に表示
     document.body.appendChild(quickAddPopupHost);
 
     const shadowRoot = quickAddPopupHost.attachShadow({ mode: "open" });
@@ -518,18 +519,47 @@ const ignoreSelectors = [
 
       // 時刻フィールドの設定
       const eventTimeInput = shadowRoot.getElementById("event-time");
+      const eventEndTimeInput = shadowRoot.getElementById("event-end-time");
       const allDayCheckbox = shadowRoot.getElementById("all-day");
+
+      // 終了時刻を計算する関数
+      const calculateEndTime = (startTime) => {
+        if (!startTime) return "";
+        const [hours, minutes] = startTime.split(":").map(Number);
+        const startDate = new Date();
+        startDate.setHours(hours, minutes, 0, 0);
+
+        const durationMs =
+          window.ChronoClipConfig?.EVENT?.DEFAULT_DURATION_MS ||
+          3 * 60 * 60 * 1000;
+        const endDate = new Date(startDate.getTime() + durationMs);
+
+        return (
+          String(endDate.getHours()).padStart(2, "0") +
+          ":" +
+          String(endDate.getMinutes()).padStart(2, "0")
+        );
+      };
 
       if (time && eventTimeInput && allDayCheckbox) {
         // 時刻が指定されている場合
         eventTimeInput.value = time;
+        if (eventEndTimeInput) {
+          eventEndTimeInput.value = calculateEndTime(time);
+        }
         allDayCheckbox.checked = false;
-        eventTimeInput.style.display = "block";
+        eventTimeInput.classList.remove("hidden");
+        if (eventEndTimeInput) {
+          eventEndTimeInput.classList.remove("hidden");
+        }
       } else if (allDayCheckbox) {
         // 終日の場合
         allDayCheckbox.checked = true;
         if (eventTimeInput) {
-          eventTimeInput.style.display = "none";
+          eventTimeInput.classList.add("hidden");
+        }
+        if (eventEndTimeInput) {
+          eventEndTimeInput.classList.add("hidden");
         }
       }
 
@@ -564,24 +594,26 @@ const ignoreSelectors = [
         popupElement.style.visibility = "";
         popupElement.style.display = "";
 
-        let top = e.clientY + window.scrollY + 10; // クリック位置から少し下に
-        let left = e.clientX + window.scrollX + 10; // クリック位置から少し右に
+        const offset = window.ChronoClipConfig?.UI?.POPUP_OFFSET || 10;
+
+        let top = e.clientY + window.scrollY + offset; // クリック位置から少し下に
+        let left = e.clientX + window.scrollX + offset; // クリック位置から少し右に
 
         // 画面下部からはみ出さないように調整
         if (top + popupRect.height > window.innerHeight + window.scrollY) {
-          top = window.innerHeight + window.scrollY - popupRect.height - 10;
+          top = window.innerHeight + window.scrollY - popupRect.height - offset;
           if (top < window.scrollY) {
             // 画面に収まらない場合は上端に
-            top = window.scrollY + 10;
+            top = window.scrollY + offset;
           }
         }
 
         // 画面右端からはみ出さないように調整
         if (left + popupRect.width > window.innerWidth + window.scrollX) {
-          left = window.innerWidth + window.scrollX - popupRect.width - 10;
+          left = window.innerWidth + window.scrollX - popupRect.width - offset;
           if (left < window.scrollX) {
             // 画面に収まらない場合は左端に
-            left = window.scrollX + 10;
+            left = window.scrollX + offset;
           }
         }
 
@@ -605,11 +637,30 @@ const ignoreSelectors = [
         allDayCheckbox.addEventListener("change", (e) => {
           if (e.target.checked) {
             eventTimeInput.classList.add("hidden");
+            if (eventEndTimeInput) {
+              eventEndTimeInput.classList.add("hidden");
+            }
           } else {
             eventTimeInput.classList.remove("hidden");
+            if (eventEndTimeInput) {
+              eventEndTimeInput.classList.remove("hidden");
+            }
             if (!eventTimeInput.value && time) {
               eventTimeInput.value = time; // デフォルト時刻を設定
+              if (eventEndTimeInput) {
+                eventEndTimeInput.value = calculateEndTime(time);
+              }
             }
+          }
+        });
+      }
+
+      // 開始時刻変更時のイベントリスナー
+      if (eventTimeInput && eventEndTimeInput) {
+        eventTimeInput.addEventListener("change", (e) => {
+          const startTime = e.target.value;
+          if (startTime) {
+            eventEndTimeInput.value = calculateEndTime(startTime);
           }
         });
       }
@@ -630,6 +681,7 @@ const ignoreSelectors = [
           }
 
           const eventTimeInput = shadowRoot.getElementById("event-time");
+          const eventEndTimeInput = shadowRoot.getElementById("event-end-time");
           const allDayCheckbox = shadowRoot.getElementById("all-day");
           const isAllDay = allDayCheckbox ? allDayCheckbox.checked : !time;
 
@@ -646,13 +698,33 @@ const ignoreSelectors = [
             };
           } else {
             // 時刻指定イベント
-            const timeValue = eventTimeInput.value;
-            const startDateTime = `${normalizedDate}T${timeValue}:00`;
+            const startTimeValue = eventTimeInput.value;
+            const endTimeValue = eventEndTimeInput
+              ? eventEndTimeInput.value
+              : null;
 
-            // 終了時刻は開始時刻の1時間後とする
-            const startDate = new Date(startDateTime);
-            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1時間後
-            const endDateTime = endDate.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
+            if (!startTimeValue) {
+              const timeInput = shadowRoot.getElementById("event-time");
+              timeInput.style.border = "1px solid red";
+              timeInput.focus();
+              return;
+            }
+
+            const startDateTime = `${normalizedDate}T${startTimeValue}:00`;
+            let endDateTime;
+
+            if (endTimeValue) {
+              // 終了時刻が指定されている場合
+              endDateTime = `${normalizedDate}T${endTimeValue}:00`;
+            } else {
+              // 終了時刻が指定されていない場合は設定値で計算
+              const startDate = new Date(startDateTime);
+              const durationMs =
+                window.ChronoClipConfig?.EVENT?.DEFAULT_DURATION_MS ||
+                3 * 60 * 60 * 1000;
+              const endDate = new Date(startDate.getTime() + durationMs);
+              endDateTime = endDate.toISOString().slice(0, 16) + ":00"; // YYYY-MM-DDTHH:MM:SS
+            }
 
             eventPayload = {
               summary: eventTitle,

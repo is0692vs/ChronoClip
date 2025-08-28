@@ -79,20 +79,24 @@
 
 .chronoclip-quick-add-popup .time-input-group {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .chronoclip-quick-add-popup .time-input-group label {
   margin-bottom: 0;
-  min-width: 40px;
+  font-size: 0.85em;
+  color: #666;
 }
 
-.chronoclip-quick-add-popup #event-time {
-  flex: 1;
+.chronoclip-quick-add-popup #event-time,
+.chronoclip-quick-add-popup #event-end-time {
+  width: 100%;
+  margin-bottom: 5px;
 }
 
-.chronoclip-quick-add-popup #event-time.hidden {
+.chronoclip-quick-add-popup #event-time.hidden,
+.chronoclip-quick-add-popup #event-end-time.hidden {
   display: none;
 }
 

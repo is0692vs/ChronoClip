@@ -373,11 +373,19 @@ function scoreTitleCandidate(text, source) {
   const normalizedText = normalizeText(text);
 
   // 理想的な長さの場合は加点（10-50文字）
+  const maxTitleLength =
+    window.ChronoClipConfig?.EXTRACTION?.MAX_TITLE_LENGTH || 100;
   if (normalizedText.length >= 10 && normalizedText.length <= 50) {
     score += 0.2;
-  } else if (normalizedText.length >= 5 && normalizedText.length <= 100) {
+  } else if (
+    normalizedText.length >= 5 &&
+    normalizedText.length <= maxTitleLength
+  ) {
     score += 0.1;
-  } else if (normalizedText.length < 3 || normalizedText.length > 200) {
+  } else if (
+    normalizedText.length < 3 ||
+    normalizedText.length > maxTitleLength * 2
+  ) {
     score -= 0.3;
   }
 
@@ -591,8 +599,10 @@ function extractEventContext(dateElement, options = {}) {
               elem.getBoundingClientRect().top -
                 dateElement.getBoundingClientRect().top
             );
-            if (distance < 100) {
-              // 100px以内の場合
+            const nearbySearchRadius =
+              window.ChronoClipConfig?.EXTRACTION?.NEARBY_SEARCH_RADIUS || 200;
+            if (distance < nearbySearchRadius / 2) {
+              // 設定値の半分以内の場合（デフォルト100px以内）
               baseScore += 0.1;
             }
 
