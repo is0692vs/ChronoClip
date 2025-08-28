@@ -231,7 +231,7 @@
       // イベントリスナー
       dateSpan.addEventListener("click", (e) => {
         e.stopPropagation(); // 親要素へのイベント伝播を防ぐ
-        showQuickAddPopup(match.original, match.date, e);
+        showQuickAddPopup(match.date, e);
       });
 
       fragment.appendChild(dateSpan);
@@ -257,7 +257,7 @@
    * @param {string} normalizedDate - 正規化された日付文字列 (YYYY-MM-DD)。
    * @param {MouseEvent} e - クリックイベントオブジェクト。
    */
-  async function showQuickAddPopup(originalDate, normalizedDate, e) {
+  async function showQuickAddPopup(normalizedDate, e) {
     // 既にポップアップが表示されている場合は非表示にする
     if (quickAddPopupHost) {
       hideQuickAddPopup();
