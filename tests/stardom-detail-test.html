@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>STARDOM詳細ページ抽出テスト</title>
+    <style>
+      body {
+        font-family: "Noto Sans JP", sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .test-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .test-url {
+        font-family: monospace;
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+      }
+      .stardom-content {
+        margin: 20px 0;
+      }
+      .tickets_title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #d41872;
+        margin: 20px 0;
+      }
+      .tickets_list_wrap {
+        border: 1px solid #ddd;
+        padding: 20px;
+        margin: 20px 0;
+      }
+      .tickets_list {
+        list-style: none;
+        padding: 0;
+      }
+      .tickets_list li {
+        display: flex;
+        border-bottom: 1px solid #eee;
+        padding: 10px 0;
+      }
+      .data {
+        width: 150px;
+        padding: 8px;
+        font-weight: bold;
+      }
+      .data_bg1 {
+        background-color: #f0f0f0;
+      }
+      .data_bg2 {
+        background-color: #e8f4fd;
+      }
+      .item {
+        flex: 1;
+        padding: 8px;
+      }
+      .date span {
+        color: #d41872;
+        font-weight: bold;
+      }
+      .time {
+        color: #2563eb;
+        font-weight: bold;
+      }
+      .place {
+        color: #059669;
+        text-decoration: none;
+      }
+      .place:hover {
+        text-decoration: underline;
+      }
+      .btnstyle3 {
+        display: inline-block;
+        background: #d41872;
+        color: white;
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 4px;
+        margin: 20px 0;
+      }
+      .btnstyle3:hover {
+        background: #b01560;
+      }
+      .aligncenter {
+        text-align: center;
+      }
+      .mb60 {
+        margin-bottom: 60px;
+      }
+      .test-info {
+        background: #e3f2fd;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+      .extraction-result {
+        background: #f3e5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-container">
+      <h1>STARDOM詳細ページ抽出ルールテスト</h1>
+
+      <div class="test-info">
+        <h3>📋 テスト概要</h3>
+        <p>
+          <strong>対象URL:</strong> https://wwr-stardom.com/schedule/(数字8桁)
+        </p>
+        <p>
+          <strong>抽出対象:</strong>
+          タイトル、日時、会場、開始時間、対戦カード情報
+        </p>
+      </div>
+
+      <div class="test-section">
+        <h2>🎭 STARDOM詳細ページ構造</h2>
+        <div class="test-url">
+          テストURL: https://wwr-stardom.com/schedule/20250906
+        </div>
+
+        <div class="stardom-content">
+          <!-- タイトル -->
+          <h2 class="tickets_title">
+            『ミツカン「鍋 THE WORLD」presents STARDOM TO THE WORLD』
+          </h2>
+
+          <!-- チケット情報 -->
+          <div class="tickets_list_wrap">
+            <ul class="tickets_list">
+              <!-- 日時 -->
+              <li>
+                <div class="data data_bg1"><p>日時</p></div>
+                <div class="item">
+                  <p class="date">
+                    <span>2025</span>年<span>9</span>月<span>6</span>日（土）
+                  </p>
+                </div>
+              </li>
+
+              <!-- 会場 -->
+              <li>
+                <div class="data data_bg1"><p>会場</p></div>
+                <div class="item">
+                  <p class="text">
+                    <a
+                      href="https://www.yokohama-budokan.com/access/"
+                      target="_blank"
+                      rel="noopener"
+                      class="linkstyle icon_window place"
+                      >神奈川・横浜武道館</a
+                    >
+                  </p>
+                </div>
+              </li>
+
+              <!-- FC会員先行入場 -->
+              <li>
+                <div class="data data_bg2">
+                  <p>FC有料<br />会員<br />先行入場</p>
+                </div>
+                <div class="item">
+                  <p class="text">
+                    <span class="time">14:30</span><br />
+                    入場時に会員証の提示
+                  </p>
+                </div>
+              </li>
+
+              <!-- 開場 -->
+              <li>
+                <div class="data data_bg2"><p>開場</p></div>
+                <div class="item">
+                  <p class="text"><span class="time">14:45</span><br /></p>
+                </div>
+              </li>
+
+              <!-- 本戦開始時間 -->
+              <li>
+                <div class="data data_bg2"><p>本戦開始時間</p></div>
+                <div class="item">
+                  <p class="text"><span class="time">16:00</span><br /></p>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- 対戦カード -->
+          <div class="aligncenter mb60">
+            <a
+              href="https://wwr-stardom.com/event/20250906_yokohama/"
+              class="btnstyle3"
+              >対戦カードを見る</a
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>🎯 抽出期待値</h2>
+        <ul>
+          <li>
+            <strong>Title:</strong> 『ミツカン「鍋 THE WORLD」presents STARDOM
+            TO THE WORLD』
+          </li>
+          <li><strong>Date:</strong> 2025-09-06 16:00 (本戦開始時間)</li>
+          <li><strong>All Day:</strong> false</li>
+          <li>
+            <strong>Details:</strong>
+            <ul>
+              <li>会場: 神奈川・横浜武道館</li>
+              <li>詳細情報: https://wwr-stardom.com/schedule/20250906</li>
+              <li>
+                対戦カード: https://wwr-stardom.com/event/20250906_yokohama/
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+
+      <div class="extraction-result">
+        <h3>🔍 抽出テスト実行</h3>
+        <p>このページで日付をクリックして抽出結果を確認してください。</p>
+        <p><strong>テスト手順:</strong></p>
+        <ol>
+          <li>拡張機能をリロード</li>
+          <li>
+            このページで「<span class="date"
+              ><span>2025</span>年<span>9</span>月<span>6</span>日（土）</span
+            >」をクリック
+          </li>
+          <li>ポップアップの内容を確認</li>
+          <li>開発者ツールのコンソールでログを確認</li>
+        </ol>
+      </div>
+    </div>
+
+    <script>
+      // URLを動的に設定してテスト
+      console.log("STARDOM Detail Extractor Test Page loaded");
+      console.log("Current URL should match pattern: /schedule/\\d{8}");
+
+      // URLパターンをテストするため、履歴を操作
+      if (window.location.pathname !== "/schedule/20250906") {
+        window.history.replaceState(
+          {},
+          "",
+          "https://wwr-stardom.com/schedule/20250906"
+        );
+      }
+    </script>
+  </body>
+</html>

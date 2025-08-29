@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>STARDOM月間スケジュール抽出エンジンテスト</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .test-container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      .stardom-calendar {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+      }
+      .calendar_year,
+      .calendar_month {
+        font-size: 24px;
+        font-weight: bold;
+        margin: 10px 0;
+      }
+      .calendar_grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 5px;
+        margin: 20px 0;
+      }
+      .calendar_grid li {
+        list-style: none;
+        border: 1px solid #ddd;
+        padding: 10px;
+        min-height: 80px;
+        position: relative;
+      }
+      .date {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 5px;
+      }
+      .box_game,
+      .box_event {
+        background: #ff6b9d;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin: 2px 0;
+        display: block;
+        text-decoration: none;
+      }
+      .schedule_list {
+        margin-top: 30px;
+      }
+      .info_box {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 8px;
+      }
+      .schedule_list .date {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+      .title {
+        font-size: 18px;
+        font-weight: bold;
+        margin: 8px 0;
+        color: #333;
+      }
+      .place {
+        color: #666;
+        font-size: 14px;
+        margin: 8px 0;
+      }
+      .info_btn .btn {
+        background: #007bff;
+        color: white;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 4px;
+        display: inline-block;
+        margin-top: 10px;
+      }
+      .test-results {
+        background: #e8f5e8;
+        border: 1px solid #4caf50;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 20px 0;
+      }
+      .test-button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      .expected-result {
+        background: #f0f8ff;
+        border: 1px solid #007bff;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-container">
+      <h1>STARDOM月間スケジュール抽出エンジンテスト</h1>
+      <p>
+        このページは、STARDOM月間スケジュールページ用の抽出エンジンをテストするためのものです。
+      </p>
+
+      <div class="test-results" id="testResults" style="display: none">
+        <h3>テスト結果</h3>
+        <div id="testOutput"></div>
+      </div>
+
+      <button class="test-button" onclick="testCalendarGridExtraction()">
+        カレンダーグリッド抽出テスト
+      </button>
+      <button class="test-button" onclick="testScheduleListExtraction()">
+        スケジュールリスト抽出テスト
+      </button>
+      <button class="test-button" onclick="testAllExtractions()">
+        全抽出テスト
+      </button>
+    </div>
+
+    <!-- STARDOM月間スケジュール風のHTML構造 -->
+    <div class="stardom-calendar">
+      <div class="calendar_year">2025</div>
+      <div class="calendar_month">8</div>
+
+      <!-- カレンダーグリッド -->
+      <ul class="calendar_grid">
+        <li>
+          <div class="date">29</div>
+          <!-- 前月の日付なのでイベントなし -->
+        </li>
+        <li>
+          <div class="date">30</div>
+          <a href="/schedule/20250830" class="box_game">
+            STARDOM SUMMER CLIMAX
+          </a>
+        </li>
+        <li>
+          <div class="date">31</div>
+          <a href="/schedule/20250831" class="box_event"> STARDOM 大会 </a>
+        </li>
+        <li>
+          <div class="date">1</div>
+          <!-- イベントなしの日 -->
+        </li>
+        <li>
+          <div class="date">2</div>
+          <a href="/schedule/20250802" class="box_game"> STARDOM WEEKEND </a>
+        </li>
+        <li>
+          <div class="date">3</div>
+          <!-- イベントなしの日 -->
+        </li>
+        <li>
+          <div class="date">4</div>
+          <!-- イベントなしの日 -->
+        </li>
+      </ul>
+
+      <!-- スケジュールリスト -->
+      <div class="schedule_list">
+        <div class="info_box">
+          <div class="date">2025.08.30 sat</div>
+          <h2 class="title">STARDOM SUMMER CLIMAX 2025</h2>
+          <p class="place">後楽園ホール</p>
+          <div class="info_btn">
+            <a href="/schedule/20250830" class="btn">詳細</a>
+          </div>
+        </div>
+
+        <div class="info_box">
+          <div class="date">2025.08.31 sun</div>
+          <h2 class="title">STARDOM 夏の陣 2025</h2>
+          <p class="place">新木場1stRING</p>
+          <div class="info_btn">
+            <a href="/schedule/20250831" class="btn">詳細</a>
+          </div>
+        </div>
+
+        <div class="info_box">
+          <div class="date">2025.09.02 tue</div>
+          <h2 class="title">STARDOM WEEKEND SPECIAL</h2>
+          <p class="place">横浜ラジアントホール</p>
+          <div class="info_btn">
+            <a href="/schedule/20250902" class="btn">詳細</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="expected-result">
+      <h3>期待される抽出結果</h3>
+      <p><strong>8月30日クリック時:</strong></p>
+      <ul>
+        <li>title: "STARDOM SUMMER CLIMAX 2025"</li>
+        <li>date: 2025-08-30 (All Day)</li>
+        <li>location: "後楽園ホール"</li>
+        <li>url: "/schedule/20250830"</li>
+        <li>description: "会場: 後楽園ホール\n詳細情報: /schedule/20250830"</li>
+      </ul>
+    </div>
+
+    <!-- 抽出エンジンのテスト用スクリプト -->
+    <script>
+      // ベース抽出エンジンの簡易版（テスト用）
+      class BaseExtractor {
+        constructor(rule) {
+          this.rule = rule || {};
+        }
+
+        async extractAll(context) {
+          throw new Error("extractAll must be implemented by subclass");
+        }
+      }
+
+      window.ChronoClipBaseExtractor = BaseExtractor;
+
+      // モックの設定
+      window.location = {
+        href: "https://wwr-stardom.com/schedule/?ym=202508",
+      };
+    </script>
+
+    <!-- STARDOM月間抽出エンジンを読み込み -->
+    <script src="../lib/extractors/stardom-month-extractor.js"></script>
+
+    <script>
+      function testCalendarGridExtraction() {
+        console.log("=== カレンダーグリッド抽出テスト ===");
+
+        // 8月30日の日付要素をクリックしたシミュレーション
+        const dateElement = document.querySelector(
+          ".calendar_grid li:nth-child(2) .date"
+        );
+
+        console.log("クリックされた日付要素:", dateElement);
+
+        const extractor = new window.ChronoClipStardomMonthExtractor();
+
+        extractor
+          .extractAll(dateElement)
+          .then((result) => {
+            console.log("抽出結果:", result);
+            displayTestResult("カレンダーグリッド抽出", result);
+          })
+          .catch((error) => {
+            console.error("抽出エラー:", error);
+            displayTestResult("カレンダーグリッド抽出", {
+              error: error.message,
+            });
+          });
+      }
+
+      function testScheduleListExtraction() {
+        console.log("=== スケジュールリスト抽出テスト ===");
+
+        // スケジュールリストの日付要素をクリックしたシミュレーション
+        const scheduleItem = document.querySelector(
+          ".schedule_list .info_box:first-child"
+        );
+
+        console.log("クリックされたスケジュール要素:", scheduleItem);
+
+        const extractor = new window.ChronoClipStardomMonthExtractor();
+
+        extractor
+          .extractAll(scheduleItem)
+          .then((result) => {
+            console.log("抽出結果:", result);
+            displayTestResult("スケジュールリスト抽出", result);
+          })
+          .catch((error) => {
+            console.error("抽出エラー:", error);
+            displayTestResult("スケジュールリスト抽出", {
+              error: error.message,
+            });
+          });
+      }
+
+      function testAllExtractions() {
+        console.log("=== 全抽出テスト ===");
+        testCalendarGridExtraction();
+        setTimeout(() => {
+          testScheduleListExtraction();
+        }, 1000);
+      }
+
+      function displayTestResult(testName, result) {
+        const resultsDiv = document.getElementById("testResults");
+        const outputDiv = document.getElementById("testOutput");
+
+        resultsDiv.style.display = "block";
+
+        const resultHTML = `
+        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+          <h4>${testName}</h4>
+          <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto;">${JSON.stringify(
+            result,
+            null,
+            2
+          )}</pre>
+        </div>
+      `;
+
+        outputDiv.innerHTML += resultHTML;
+      }
+
+      // ページロード時にテスト環境の説明を表示
+      console.log(
+        "STARDOM月間スケジュール抽出エンジンテストページが読み込まれました"
+      );
+      console.log("テストボタンをクリックして抽出をテストしてください");
+    </script>
+  </body>
+</html>

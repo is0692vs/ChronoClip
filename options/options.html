@@ -134,18 +134,376 @@
           </div>
 
           <div class="setting-item site-rules-hidden" id="siteRulesContainer">
-            <label>サイト固有ルール</label>
+            <!-- 現在のタブ提案 -->
+            <div
+              class="current-tab-suggestion hidden"
+              id="currentTabSuggestion"
+            >
+              <p class="suggestion-text">
+                現在開いているタブ：<strong id="currentTabDomain"></strong>
+              </p>
+              <button
+                type="button"
+                id="addCurrentSiteBtn"
+                class="secondary-btn"
+              >
+                このサイトのルールを追加
+              </button>
+            </div>
+
+            <!-- サイトルール一覧 -->
+            <div class="site-rules-header">
+              <label>設定済みサイトルール</label>
+              <input
+                type="text"
+                id="siteRuleSearch"
+                placeholder="ドメイン名で検索..."
+                class="search-input"
+              />
+            </div>
+
             <div class="site-rules-list" id="siteRulesList">
+              <div class="no-rules-message" id="noRulesMessage">
+                <p>まだサイトルールが設定されていません。</p>
+                <p>
+                  「新しいルールを追加」ボタンまたは現在のタブの提案からルールを作成してください。
+                </p>
+              </div>
               <!-- JavaScriptで動的生成 -->
             </div>
-            <button type="button" id="addSiteRuleBtn" class="secondary-btn">
-              + 新しいルールを追加
-            </button>
+
+            <div class="site-rules-actions">
+              <button type="button" id="addSiteRuleBtn" class="secondary-btn">
+                + 新しいルールを追加
+              </button>
+              <button
+                type="button"
+                id="exportSiteRulesBtn"
+                class="secondary-btn"
+              >
+                ルールをエクスポート
+              </button>
+              <input
+                type="file"
+                id="importSiteRulesInput"
+                accept=".json"
+                class="hidden"
+                title="インポートファイル選択"
+              />
+              <button
+                type="button"
+                id="importSiteRulesBtn"
+                class="secondary-btn"
+              >
+                ルールをインポート
+              </button>
+            </div>
+
             <p class="description">
-              特定のサイトで使用するCSSセレクターや抽出ルールを設定
+              特定のサイトで使用するCSSセレクターや抽出ルールを設定できます。<br />
+              ドメインごとに日付の検出方法、タイトル・詳細の抽出方法をカスタマイズできます。
             </p>
           </div>
         </section>
+
+        <!-- サイトルール編集モーダル -->
+        <div id="siteRuleModal" class="modal">
+          <div class="modal-content site-rule-modal-content">
+            <div class="modal-header">
+              <h3 id="siteRuleModalTitle">サイトルールの編集</h3>
+              <button type="button" class="modal-close" id="closeSiteRuleModal">
+                &times;
+              </button>
+            </div>
+
+            <div class="modal-body">
+              <form id="siteRuleForm">
+                <!-- 基本設定 -->
+                <div class="rule-section">
+                  <h4>基本設定</h4>
+                  <div class="setting-item">
+                    <label for="ruleDomain">ドメイン名</label>
+                    <input
+                      type="text"
+                      id="ruleDomain"
+                      name="domain"
+                      placeholder="example.com"
+                      required
+                    />
+                    <p class="field-description">ルールを適用するドメイン名</p>
+                  </div>
+
+                  <div class="setting-item">
+                    <label>
+                      <input type="checkbox" id="ruleEnabled" name="enabled" />
+                      このルールを有効にする
+                    </label>
+                  </div>
+
+                  <div class="setting-item">
+                    <label>
+                      <input
+                        type="checkbox"
+                        id="ruleInheritSubdomains"
+                        name="inheritSubdomains"
+                      />
+                      サブドメインにも適用
+                    </label>
+                    <p class="field-description">
+                      例：example.com の設定を sub.example.com にも適用
+                    </p>
+                  </div>
+                </div>
+
+                <!-- 日付検出設定 -->
+                <div class="rule-section">
+                  <h4>日付検出設定</h4>
+                  <div class="setting-item">
+                    <label for="ruleDateAnchor">日付要素セレクター</label>
+                    <input
+                      type="text"
+                      id="ruleDateAnchor"
+                      name="dateAnchor"
+                      placeholder=".date, time[datetime], .published"
+                    />
+                    <p class="field-description">
+                      日付を含む要素のCSSセレクター
+                    </p>
+                  </div>
+
+                  <div class="setting-item">
+                    <label for="ruleDateBlock">ブロック境界セレクター</label>
+                    <input
+                      type="text"
+                      id="ruleDateBlock"
+                      name="dateBlock"
+                      placeholder="article, .card, .item"
+                    />
+                    <p class="field-description">
+                      関連情報をまとめる単位となる要素
+                    </p>
+                  </div>
+                </div>
+
+                <!-- タイトル抽出設定 -->
+                <div class="rule-section">
+                  <h4>タイトル抽出設定</h4>
+                  <div class="setting-item">
+                    <label for="ruleTitleSelector">タイトルセレクター</label>
+                    <input
+                      type="text"
+                      id="ruleTitleSelector"
+                      name="titleSelector"
+                      placeholder="h1, h2, .title, .headline"
+                    />
+                    <p class="field-description">
+                      同じブロック内のタイトル要素セレクター
+                    </p>
+                  </div>
+
+                  <div class="setting-item">
+                    <label>
+                      <input
+                        type="checkbox"
+                        id="ruleTitleFallback"
+                        name="titleFallback"
+                      />
+                      見出しからのフォールバック
+                    </label>
+                    <p class="field-description">
+                      ブロック内にタイトルがない場合、前の見出しを使用
+                    </p>
+                  </div>
+                </div>
+
+                <!-- 詳細抽出設定 -->
+                <div class="rule-section">
+                  <h4>詳細抽出設定</h4>
+                  <div class="setting-item">
+                    <label for="ruleDescSelectors"
+                      >詳細セレクター（1行1個）</label
+                    >
+                    <textarea
+                      id="ruleDescSelectors"
+                      name="descSelectors"
+                      placeholder="p&#10;.description&#10;.content"
+                      rows="3"
+                    ></textarea>
+                    <p class="field-description">
+                      詳細を抽出する要素のセレクター（改行区切り）
+                    </p>
+                  </div>
+
+                  <div class="setting-item">
+                    <label for="ruleMaxBlocks">最大ブロック数</label>
+                    <input
+                      type="number"
+                      id="ruleMaxBlocks"
+                      name="maxBlocks"
+                      min="1"
+                      max="10"
+                      value="3"
+                    />
+                    <p class="field-description">
+                      詳細として収集する最大ブロック数
+                    </p>
+                  </div>
+
+                  <div class="setting-item">
+                    <label for="ruleIncludeURL">URL含有設定</label>
+                    <select id="ruleIncludeURL" name="includeURL">
+                      <option value="inherit">グローバル設定に従う</option>
+                      <option value="true">URLを含める</option>
+                      <option value="false">URLを含めない</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- 場所・時間設定（折りたたみ） -->
+                <div class="rule-section collapsible">
+                  <h4
+                    class="collapsible-header"
+                    data-target="locationTimeSection"
+                  >
+                    場所・時間設定（オプション）
+                    <span class="collapsible-icon">▼</span>
+                  </h4>
+                  <div class="collapsible-content" id="locationTimeSection">
+                    <div class="setting-item">
+                      <label for="ruleLocationSelector">場所セレクター</label>
+                      <input
+                        type="text"
+                        id="ruleLocationSelector"
+                        name="locationSelector"
+                        placeholder=".venue, .location, [itemprop=location]"
+                      />
+                    </div>
+
+                    <div class="setting-item">
+                      <label for="ruleTimeStart">開始時刻セレクター</label>
+                      <input
+                        type="text"
+                        id="ruleTimeStart"
+                        name="timeStart"
+                        placeholder=".start-time, .time-start"
+                      />
+                    </div>
+
+                    <div class="setting-item">
+                      <label for="ruleTimeEnd">終了時刻セレクター</label>
+                      <input
+                        type="text"
+                        id="ruleTimeEnd"
+                        name="timeEnd"
+                        placeholder=".end-time, .time-end"
+                      />
+                    </div>
+
+                    <div class="setting-item">
+                      <label>
+                        <input
+                          type="checkbox"
+                          id="rulePreferDateTime"
+                          name="preferDateTime"
+                        />
+                        datetime属性を優先
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- フィルター設定（折りたたみ） -->
+                <div class="rule-section collapsible">
+                  <h4 class="collapsible-header" data-target="filterSection">
+                    フィルター設定（オプション）
+                    <span class="collapsible-icon">▼</span>
+                  </h4>
+                  <div class="collapsible-content" id="filterSection">
+                    <div class="setting-item">
+                      <label for="ruleRemoveSelectors"
+                        >ノイズ除去セレクター（1行1個）</label
+                      >
+                      <textarea
+                        id="ruleRemoveSelectors"
+                        name="removeSelectors"
+                        placeholder=".ad&#10;.advertisement&#10;.sidebar"
+                        rows="3"
+                      ></textarea>
+                      <p class="field-description">
+                        抽出前に除去する要素のセレクター
+                      </p>
+                    </div>
+
+                    <div class="setting-item">
+                      <label for="ruleStopwords"
+                        >ストップワード（1行1個）</label
+                      >
+                      <textarea
+                        id="ruleStopwords"
+                        name="stopwords"
+                        placeholder="advertisement&#10;sponsored&#10;PR"
+                        rows="3"
+                      ></textarea>
+                      <p class="field-description">
+                        このサイト特有のノイズとなる単語
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 高度な設定（折りたたみ） -->
+                <div class="rule-section collapsible">
+                  <h4 class="collapsible-header" data-target="advancedSection">
+                    高度な設定（オプション）
+                    <span class="collapsible-icon">▼</span>
+                  </h4>
+                  <div class="collapsible-content" id="advancedSection">
+                    <div class="setting-item">
+                      <label for="ruleCustomJoiner">カスタム結合文字</label>
+                      <input
+                        type="text"
+                        id="ruleCustomJoiner"
+                        name="customJoiner"
+                        placeholder=" / "
+                      />
+                      <p class="field-description">
+                        複数の詳細ブロックを結合する文字
+                      </p>
+                    </div>
+
+                    <div class="setting-item">
+                      <label>
+                        <input
+                          type="checkbox"
+                          id="ruleTrimBrackets"
+                          name="trimBrackets"
+                        />
+                        括弧の圧縮
+                      </label>
+                      <p class="field-description">日本語の括弧表記を圧縮</p>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" id="testSiteRuleBtn" class="secondary-btn">
+                テスト実行
+              </button>
+              <button type="button" id="saveSiteRuleBtn" class="primary-btn">
+                保存
+              </button>
+              <button
+                type="button"
+                id="deleteSiteRuleBtn"
+                class="danger-btn hidden"
+              >
+                削除
+              </button>
+            </div>
+          </div>
+        </div>
 
         <!-- アクションボタン -->
         <section class="action-section">
@@ -179,7 +537,7 @@
     <footer>
       <p>ChronoClip v1.0 - ウェブページの日付をGoogleカレンダーに簡単追加</p>
       <div class="test-button-container">
-        <button type="button" onclick="openTestPage()" class="test-button">
+        <button type="button" id="openTestPageBtn" class="test-button">
           📊 設定システムのテストページを開く
         </button>
       </div>
@@ -187,6 +545,12 @@
 
     <!-- スクリプト読み込み -->
     <script src="../lib/settings.js"></script>
+    <script src="../lib/site-rule-manager.js"></script>
+    <script src="../lib/extractors/base-extractor.js"></script>
+    <script src="../lib/extractors/eventbrite-extractor.js"></script>
+    <script src="../lib/extractors/amazon-extractor.js"></script>
+    <script src="../lib/extractors/general-extractor.js"></script>
+    <script src="../lib/extractors/extractor-factory.js"></script>
     <script src="options.js"></script>
   </body>
 </html>
