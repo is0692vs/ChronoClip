@@ -1402,10 +1402,10 @@ function showQuickAddPopupWithData(extractedData) {
       existingPopup.remove();
     }
 
-    // ポップアップの位置を画面中央に設定
+    // ポップアップの位置を画面上部寄りに設定
     const rect = {
       left: window.innerWidth / 2 - 200, // 幅400pxとして中央配置
-      top: window.innerHeight / 2 - 150, // 高さ300pxとして中央配置
+      top: Math.max(50, window.innerHeight / 4 - 150), // 上部1/4位置、最低50px確保
       width: 400,
       height: 300,
     };
@@ -1421,19 +1421,72 @@ function showQuickAddPopupWithData(extractedData) {
       events: extractedData.events,
     });
 
-    if (extractedData.dateTime) {
+    if (extractedData.events && extractedData.events.length > 0) {
+      // eventsフィールドから日付情報とURLを優先的に使用
+      const firstEvent = extractedData.events[0];
+      if (firstEvent.startTime) {
+        const dateObj = new Date(firstEvent.startTime);
+        if (!isNaN(dateObj.getTime())) {
+          dateInfo = {
+            type: "datetime",
+            start: {
+              dateTime: firstEvent.startTime,
+              hour: dateObj.getHours(),
+              minute: dateObj.getMinutes(),
+            },
+            end: { dateTime: firstEvent.endTime || firstEvent.startTime },
+          };
+          console.log(
+            "ChronoClip: Created date info from first event:",
+            dateInfo
+          );
+        }
+      }
+      // URLもfirstEventから取得
+      if (firstEvent.url) {
+        extractedData.url = firstEvent.url;
+        console.log(
+          "ChronoClip: Overwrote URL from first event:",
+          firstEvent.url
+        );
+      }
+    } else if (extractedData.dateTime) {
       dateInfo = extractedData.dateTime;
       console.log("ChronoClip: Using extracted dateTime:", dateInfo);
     } else if (extractedData.date) {
-      // date フィールドから日付情報を作成
+      // date フィールドから日付情報を作成（時刻情報も考慮）
       const dateObj = new Date(extractedData.date);
       if (!isNaN(dateObj.getTime())) {
-        dateInfo = {
-          type: "date",
-          start: { date: formatDate(dateObj) },
-          end: { date: formatDate(dateObj) },
-        };
-        console.log("ChronoClip: Created date info from date field:", dateInfo);
+        // 時刻がある場合（0:00以外）は datetime として扱う
+        if (dateObj.getHours() !== 0 || dateObj.getMinutes() !== 0) {
+          dateInfo = {
+            type: "datetime",
+            start: {
+              dateTime: dateObj.toISOString(),
+              hour: dateObj.getHours(),
+              minute: dateObj.getMinutes(),
+            },
+            end: {
+              dateTime: new Date(
+                dateObj.getTime() + 3 * 60 * 60 * 1000
+              ).toISOString(),
+            },
+          };
+          console.log(
+            "ChronoClip: Created datetime info from date field:",
+            dateInfo
+          );
+        } else {
+          dateInfo = {
+            type: "date",
+            start: { date: formatDate(dateObj) },
+            end: { date: formatDate(dateObj) },
+          };
+          console.log(
+            "ChronoClip: Created date info from date field:",
+            dateInfo
+          );
+        }
       }
     } else if (extractedData.events && extractedData.events.length > 0) {
       // eventsフィールドから日付情報を作成
@@ -1467,6 +1520,7 @@ function showQuickAddPopupWithData(extractedData) {
     let title = extractedData.title;
     let description =
       extractedData.description || extractedData.source?.selectionText || "";
+    let eventSpecificUrl = extractedData.url; // 初期値はextractedData.url
 
     // タイトルが取得できていない場合、eventsからタイトルを取得
     if (!title && extractedData.events && extractedData.events.length > 0) {
@@ -1484,12 +1538,21 @@ function showQuickAddPopupWithData(extractedData) {
       console.log("ChronoClip: Using description from events:", description);
     }
 
+    // eventsからのURL更新を反映
+    eventSpecificUrl = extractedData.url;
+
+    // URLが設定されていない場合のフォールバック
+    if (!eventSpecificUrl) {
+      eventSpecificUrl = window.location.href;
+    }
+
     // 最終的なフォールバック
     title = title || "イベント";
 
-    console.log("ChronoClip: Final title and description:", {
+    console.log("ChronoClip: Final title, description, and URL:", {
       title,
       description,
+      url: eventSpecificUrl,
     });
 
     // ポップアップを表示
@@ -1498,7 +1561,7 @@ function showQuickAddPopupWithData(extractedData) {
       eventData: {
         title: title,
         description: description,
-        url: extractedData.url || window.location.href,
+        url: eventSpecificUrl,
         source: extractedData.source,
       },
       position: {
@@ -1512,7 +1575,7 @@ function showQuickAddPopupWithData(extractedData) {
       {
         title: title,
         description: description,
-        url: extractedData.url || window.location.href,
+        url: eventSpecificUrl,
         source: extractedData.source,
       },
       {
@@ -1600,7 +1663,7 @@ async function showQuickAddPopupForExtractedData(
 
     // フォームに抽出データを設定
     const titleInput = shadowRoot.getElementById("event-title");
-    const descriptionInput = shadowRoot.getElementById("event-description");
+    const descriptionInput = shadowRoot.getElementById("event-details"); // 正しいIDに修正
     const dateInput = shadowRoot.getElementById("event-date");
     const timeInput = shadowRoot.getElementById("event-time");
     const endTimeInput = shadowRoot.getElementById("event-end-time");
@@ -1612,6 +1675,12 @@ async function showQuickAddPopupForExtractedData(
       let dateStr = "";
       if (dateInfo.start.date) {
         dateStr = dateInfo.start.date;
+      } else if (dateInfo.start.dateTime) {
+        // dateTimeから日付部分を抽出
+        const dateObj = new Date(dateInfo.start.dateTime);
+        if (!isNaN(dateObj.getTime())) {
+          dateStr = dateObj.toISOString().split("T")[0]; // YYYY-MM-DD形式
+        }
       } else if (
         dateInfo.start.year &&
         dateInfo.start.month &&
@@ -1664,38 +1733,132 @@ async function showQuickAddPopupForExtractedData(
       // 日付フィールドは空白のまま（上記で既に設定済み）
     }
 
-    if (descriptionInput && eventData.description) {
-      descriptionInput.value = eventData.description;
+    if (descriptionInput) {
+      let description = eventData.description || "";
+
+      console.log("ChronoClip: Setting description:", {
+        originalDescription: description,
+        eventDataUrl: eventData.url,
+        currentUrl: window.location.href,
+        urlExists: !!eventData.url,
+        urlDifferent: eventData.url !== window.location.href,
+        urlNotInDescription: !description.includes(eventData.url),
+      });
+
+      // URLが別途存在する場合は、詳細フィールドにも追加
+      if (
+        eventData.url &&
+        eventData.url !== window.location.href &&
+        !description.includes(eventData.url)
+      ) {
+        description += `\n\n詳細: ${eventData.url}`;
+        console.log("ChronoClip: Added URL to description:", description);
+      }
+
+      descriptionInput.value = description;
     }
 
     // 時刻設定
-    const hasTime =
+    let hasTime = false;
+    if (
       dateInfo &&
       dateInfo.start &&
-      dateInfo.start.hour !== undefined &&
-      dateInfo.start.minute !== undefined;
+      (dateInfo.start.hour !== undefined ||
+        (dateInfo.start.dateTime &&
+          new Date(dateInfo.start.dateTime).getHours() !== undefined))
+    ) {
+      try {
+        let startTimeDate;
+        if (dateInfo.start.hour !== undefined) {
+          // hour/minuteが直接指定されている場合
+          hasTime = true;
+          const hour = dateInfo.start.hour;
+          const minute = dateInfo.start.minute || 0;
 
-    if (hasTime) {
-      if (allDayCheckbox) allDayCheckbox.checked = false;
-      if (timeInput) {
-        timeInput.value = `${String(dateInfo.start.hour).padStart(
-          2,
-          "0"
-        )}:${String(dateInfo.start.minute).padStart(2, "0")}`;
-        timeInput.style.display = "block";
+          if (allDayCheckbox) allDayCheckbox.checked = false;
+          if (timeInput) {
+            timeInput.value = `${String(hour).padStart(2, "0")}:${String(
+              minute
+            ).padStart(2, "0")}`;
+            timeInput.style.display = "block";
+          }
+          if (endTimeInput) {
+            // デフォルト終了時刻を3時間後に設定
+            const endHour = (hour + 3) % 24;
+            endTimeInput.value = `${String(endHour).padStart(2, "0")}:${String(
+              minute
+            ).padStart(2, "0")}`;
+            endTimeInput.style.display = "block";
+          }
+          console.log(
+            "ChronoClip: Set time from hour/minute:",
+            hour,
+            minute,
+            "->",
+            timeInput.value
+          );
+        } else if (dateInfo.start.dateTime) {
+          // dateTimeが指定されている場合
+          startTimeDate = new Date(dateInfo.start.dateTime);
+          if (!isNaN(startTimeDate.getTime())) {
+            hasTime = true;
+            const hour = startTimeDate.getHours();
+            const minute = startTimeDate.getMinutes();
+
+            if (allDayCheckbox) allDayCheckbox.checked = false;
+            if (timeInput) {
+              timeInput.value = `${String(hour).padStart(2, "0")}:${String(
+                minute
+              ).padStart(2, "0")}`;
+              timeInput.style.display = "block";
+            }
+            if (endTimeInput) {
+              // デフォルト終了時刻を3時間後に設定
+              const endDate = new Date(
+                startTimeDate.getTime() + 3 * 60 * 60 * 1000
+              );
+              const endHour = endDate.getHours();
+              const endMinute = endDate.getMinutes();
+              endTimeInput.value = `${String(endHour).padStart(
+                2,
+                "0"
+              )}:${String(endMinute).padStart(2, "0")}`;
+              endTimeInput.style.display = "block";
+            }
+            console.log(
+              "ChronoClip: Set time from dateTime:",
+              dateInfo.start.dateTime,
+              "->",
+              timeInput.value
+            );
+          }
+        }
+      } catch (error) {
+        console.warn("ChronoClip: Failed to parse dateInfo.start:", error);
       }
-      if (endTimeInput) {
-        endTimeInput.style.display = "block";
-        // デフォルト終了時刻を3時間後に設定
-        const endHour = (dateInfo.start.hour + 3) % 24;
-        endTimeInput.value = `${String(endHour).padStart(2, "0")}:${String(
-          dateInfo.start.minute
-        ).padStart(2, "0")}`;
-      }
-    } else {
-      if (allDayCheckbox) allDayCheckbox.checked = true;
-      if (timeInput) timeInput.style.display = "none";
-      if (endTimeInput) endTimeInput.style.display = "none";
+    }
+
+    if (allDayCheckbox) {
+      allDayCheckbox.checked = !hasTime;
+    }
+    if (timeInput) {
+      timeInput.style.display = hasTime ? "block" : "none";
+    }
+    if (endTimeInput) {
+      endTimeInput.style.display = hasTime ? "block" : "none";
+    }
+
+    // All Dayチェックボックスの変更で時間フィールドの表示/非表示を切り替え
+    if (allDayCheckbox) {
+      allDayCheckbox.addEventListener("change", () => {
+        const isAllDay = allDayCheckbox.checked;
+        if (timeInput) {
+          timeInput.style.display = isAllDay ? "none" : "block";
+        }
+        if (endTimeInput) {
+          endTimeInput.style.display = isAllDay ? "none" : "block";
+        }
+      });
     }
 
     // イベントハンドラー設定
@@ -1730,13 +1893,12 @@ async function showQuickAddPopupForExtractedData(
         e.preventDefault();
 
         try {
-          const formData = new FormData(form);
-          const title =
-            formData.get("title") || eventData.title || "無題のイベント";
-          const description =
-            formData.get("description") || eventData.description || "";
-          const date = formData.get("date");
-          const isAllDay = formData.get("all-day") === "on";
+          const title = shadowRoot.getElementById("event-title").value;
+          const description = shadowRoot.getElementById("event-details").value;
+          const date = shadowRoot.getElementById("event-date").value;
+          const isAllDay = shadowRoot.getElementById("all-day").checked;
+          const startTime = shadowRoot.getElementById("event-time").value;
+          const endTime = shadowRoot.getElementById("event-end-time").value;
 
           // バリデーション
           if (!date) {
@@ -1767,12 +1929,8 @@ async function showQuickAddPopupForExtractedData(
               description: description,
               start: { date: date },
               end: { date: date },
-              url: eventData.url || window.location.href,
             };
           } else {
-            const startTime = formData.get("start-time");
-            const endTime = formData.get("end-time");
-
             if (!startTime) {
               showToast("error", "開始時刻を入力してください");
               const timeInput = shadowRoot.getElementById("event-time");
@@ -1782,39 +1940,88 @@ async function showQuickAddPopupForExtractedData(
               }
               return;
             }
-            const startDateTime = `${date}T${startTime}:00`;
-            const endDateTime = `${date}T${endTime}:00`;
+
+            const startDateTimeStr = `${date}T${startTime}:00`;
+            let endDateTimeStr = endTime ? `${date}T${endTime}:00` : null;
+
+            // 終了時刻が開始時刻より前の場合は、翌日の日付として扱う
+            let endDateTime;
+            if (endDateTimeStr) {
+              const startDate = new Date(startDateTimeStr);
+              const endDate = new Date(endDateTimeStr);
+              if (endDate < startDate) {
+                endDate.setDate(endDate.getDate() + 1);
+              }
+              endDateTime = endDate.toISOString();
+            } else {
+              // 終了時刻がない場合は、開始時刻から3時間後を設定
+              const startDate = new Date(startDateTimeStr);
+              endDateTime = new Date(
+                startDate.getTime() + 3 * 60 * 60 * 1000
+              ).toISOString();
+            }
 
             eventPayload = {
               summary: title,
               description: description,
               start: {
-                dateTime: startDateTime,
+                dateTime: startDateTimeStr,
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               },
               end: {
                 dateTime: endDateTime,
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               },
-              url: eventData.url || window.location.href,
             };
           }
 
+          // URLをペイロードに追加
+          if (eventData.url && eventData.url !== window.location.href) {
+            eventPayload.url = eventData.url;
+          }
+
           // Googleカレンダーに追加
-          chrome.runtime.sendMessage({
-            type: "add_to_calendar",
-            payload: eventPayload,
-          });
+          console.log("ChronoClip: Sending event to background:", eventPayload);
+          chrome.runtime.sendMessage(
+            {
+              type: "calendar:createEvent",
+              payload: eventPayload,
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.error(
+                  "ChronoClip: Error sending message:",
+                  chrome.runtime.lastError.message
+                );
+                showToast(
+                  "error",
+                  `イベント追加に失敗しました: ${chrome.runtime.lastError.message}`
+                );
+                return;
+              }
+              if (response && response.success) {
+                showToast(
+                  "success",
+                  `イベント「${eventPayload.summary}」をカレンダーに追加しました。`
+                );
+              } else {
+                showToast(
+                  "error",
+                  `イベントの追加に失敗しました: ${
+                    response ? response.error : "不明なエラー"
+                  }`
+                );
+              }
+            }
+          );
 
           popupHost.remove();
-          showToast("success", "イベントをGoogleカレンダーに追加しました！");
         } catch (error) {
           console.error("ChronoClip: Error adding event:", error);
           showToast("error", "イベントの追加でエラーが発生しました");
         }
       });
     }
-
     console.log("ChronoClip: Quick add popup displayed for extracted data");
   } catch (error) {
     console.error(
