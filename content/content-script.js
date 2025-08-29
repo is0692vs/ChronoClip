@@ -36,11 +36,17 @@ const ignoreSelectors = [
 
     log() {
       const elapsedTime = performance.now() - this.startTime;
-      console.log(
-        `ChronoClip Performance: ${this.processedNodes} nodes processed, ${
-          this.extractionCalls
-        } extractions in ${elapsedTime.toFixed(2)}ms`
-      );
+      // パフォーマンスログは5分ごと、または大量処理時のみ
+      if (elapsedTime > 300000 || this.processedNodes > 1000) {
+        console.log(
+          `ChronoClip Performance: ${this.processedNodes} nodes processed, ${
+            this.extractionCalls
+          } extractions in ${elapsedTime.toFixed(2)}ms`
+        );
+        this.startTime = performance.now(); // リセット
+        this.processedNodes = 0;
+        this.extractionCalls = 0;
+      }
     },
   };
 
@@ -983,11 +989,12 @@ const ignoreSelectors = [
     }
 
     mutationTimeout = setTimeout(() => {
-      console.log(
-        `ChronoClip: Processing ${pendingMutations.length} mutations${
-          hasMajorChanges ? " (major changes detected)" : ""
-        }`
-      );
+      // 大きな変更がある場合のみログ出力
+      if (hasMajorChanges && pendingMutations.length > 50) {
+        console.log(
+          `ChronoClip: Processing ${pendingMutations.length} major mutations`
+        );
+      }
 
       if (hasMajorChanges) {
         // 大きな変更の場合は、ページ全体を再スキャン
@@ -1084,7 +1091,13 @@ const ignoreSelectors = [
  * サービスワーカーからのメッセージをリッスンします。
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("ChronoClip: Content script received message:", message);
+  // エラー以外のメッセージは基本的にログ出力しない
+  if (
+    message.type !== "show_toast" &&
+    message.type !== "show_quick_add_popup"
+  ) {
+    console.log("ChronoClip: Content script received message:", message);
+  }
 
   switch (message.type) {
     case "show_toast":
@@ -1095,8 +1108,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Issue #11: 選択範囲モードからのポップアップ表示
       if (message.payload && message.payload.extractedData) {
         const data = message.payload.extractedData;
-        console.log("ChronoClip: Showing popup for extracted data:", data);
-
         // 抽出されたデータを使ってポップアップを表示
         showQuickAddPopupWithData(data);
       }

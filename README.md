@@ -29,7 +29,21 @@ ChronoClip は、ウェブサイト上の日付情報を自動的に検出し、
 - 抽出に失敗した場合でも手動で編集可能
 - 「2025 年 09 月 13 日 (土) 17:30 開場」のような複雑な日付時刻形式にも対応
 
-### 4. 高度な日付解析
+### 4. サイト固有検出機能 ✨ **NEW!**
+
+- EventBrite、Amazon、楽天などの主要サイトに対応した専用抽出パターン
+- サイトごとに最適化されたセレクターと抽出戦略
+- 設定ファイルによる簡単なカスタマイズとパターン追加
+- 一般的なサイト用のフォールバックパターンも提供
+
+### 5. 統合検出エンジン ✨ **NEW!**
+
+- 選択右クリックと常時ハイライトで共通利用可能な抽出ロジック
+- モジュール化されたアーキテクチャで拡張・カスタマイズが容易
+- 複数の検出戦略を優先度順で自動適用
+- 抽出結果の信頼度スコア計算
+
+### 6. 高度な日付解析
 
 - chrono-node ライブラリによる自然言語日付解析
 - 正規表現フォールバックによる幅広い日付形式サポート
@@ -91,7 +105,39 @@ ChronoClip は、ウェブサイト上の日付情報を自動的に検出し、
 - 令和7年8月27日
 - Aug 27, 2025 6pm
 - 27th August 2025
-````
+```
+
+## 🔜 開発ロードマップ
+
+1. ✅ 基本構造のセットアップ - 拡張機能の基本フレームワーク構築
+2. ✅ 日付検出機能 - 様々な形式の日付を検出する機能
+3. ✅ UI 実装 - 使いやすいインターフェースの構築
+4. ✅ Google Calendar 連携 - カレンダーへの追加機能
+5. ✅ コンテキスト抽出 - イベント詳細の自動抽出（Issue #10）
+6. ✅ 手動選択機能 - 右クリックメニューからの選択範囲追加（Issue #11）
+7. ✅ 統合モジュール化 - 拡張性とカスタマイズ性の向上
+8. 🔄 高度な機能 - 一括追加、サイト別設定など
+
+## 🛠 技術仕様
+
+### アーキテクチャ
+
+- **Manifest v3**: 最新の Chrome 拡張仕様に準拠
+- **Shadow DOM**: UI の分離とスタイル競合回避
+- **chrono-node**: 自然言語日付解析ライブラリ
+- **OAuth 2.0**: Google Calendar API 認証
+- **モジュラー設計**: 検出エンジンと抽出APIの統合アーキテクチャ
+
+### ファイル構成
+
+```text
+ChronoClip/
+├── manifest.json                 # 拡張機能設定
+├── config/
+│   ├── constants.js             # 設定定数
+│   └── site-patterns.js         # サイト固有検出パターン
+├── background/
+│   └── service-worker.js        # バックグラウンド処理`
 
 ## 🔜 開発ロードマップ
 
@@ -121,11 +167,18 @@ ChronoClip/
 │   └── service-worker.js        # バックグラウンド処理
 ├── content/
 │   ├── content-script.js        # メインコンテンツスクリプト
-│   ├── extractor.js            # イベント情報抽出ロジック
+│   ├── event-detector.js        # 統合イベント検出エンジン
+│   ├── extractor-api.js         # 統合抽出API
+│   ├── extractor.js            # 旧イベント情報抽出ロジック（互換性）
 │   └── selection.js            # 手動選択モード処理
 ├── lib/
 │   ├── chrono.min.js           # 日付解析ライブラリ
-│   └── date-parser.js          # 日付解析wrapper
+│   ├── date-parser.js          # 日付解析wrapper
+│   ├── date-utils.js           # 日付ユーティリティ
+│   └── regex-patterns.js       # 正規表現パターン
+├── tests/
+│   ├── integrated-module-test.html  # 統合モジュールテスト
+│   └── date-parsing-test.html   # 日付解析テスト
 ├── quick-add-popup.html         # ポップアップUI
 ├── quick-add-popup.css          # ポップアップスタイル
 └── config/
@@ -175,6 +228,68 @@ ChronoClip では、`config/constants.js` ファイルで各種定数と設定�
 ##### パフォーマンス関連設定
 
 - `MUTATION_DEBOUNCE_MS`: MutationObserver のデバウンス時間（デフォルト: 500ms）
+
+### サイト固有パターンのカスタマイズ ✨ **NEW!**
+
+`config/site-patterns.js`ファイルでサイト固有の検出パターンをカスタマイズできます。
+
+#### カスタムサイトパターンの追加
+
+```javascript
+// カスタムパターンの追加例
+window.addCustomSitePattern('my-custom-site', {
+  domains: ['example.com', 'subdomain.example.com'],
+  selectors: {
+    title: ['.event-title', 'h1.title'],
+    date: ['.event-date', '.schedule'],
+    description: ['.event-description', '.content'],
+    price: ['.price', '.cost']
+  },
+  dateFormats: ['YYYY年MM月DD日', 'MM月DD日'],
+  priority: 15,  // 優先度（高いほど先に適用）
+  extraction: {
+    dateStrategy: 'site-specific',
+    titleStrategy: 'site-specific',
+    descriptionStrategy: 'general'
+  }
+});
+```
+
+#### 既存パターンの更新
+
+```javascript
+// 既存パターンの部分更新
+window.updateSitePattern('eventbrite', {
+  selectors: {
+    title: ['.event-title', '.custom-title'],  // セレクターを追加
+    // 他の設定は既存のまま保持
+  },
+  priority: 20  // 優先度のみ変更
+});
+```
+
+### 抽出戦略のカスタマイズ ✨ **NEW!**
+
+統合検出エンジンに独自の抽出戦略を追加できます。
+
+```javascript
+// カスタム抽出戦略の追加例
+window.ChronoClipExtractor.addCustomStrategy('my-strategy', {
+  extractDate: async (context) => {
+    // 独自の日付抽出ロジック
+    return dateInfo;
+  },
+  extractTitle: async (context) => {
+    // 独自のタイトル抽出ロジック
+    return title;
+  },
+  extractDescription: async (context) => {
+    // 独自の詳細抽出ロジック
+    return description;
+  },
+  priority: 12  // 既存戦略との優先度調整
+});
+```
 - `BATCH_SIZE`: バッチ処理のサイズ（デフォルト: 100）
 - `MAX_NODES`: 処理対象の最大ノード数（デフォルト: 1000）
 
@@ -199,3 +314,4 @@ EVENT: {
   // その他の設定...
 }
 ```
+````

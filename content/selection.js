@@ -23,39 +23,39 @@ function convertDateParserFormat(parsedDate) {
     // 時刻付きイベント
     const startDate = new Date(parsedDate.start.dateTime);
     const endDate = new Date(parsedDate.end.dateTime);
-    
+
     result.start = {
       year: startDate.getFullYear(),
       month: startDate.getMonth() + 1,
       day: startDate.getDate(),
       hour: startDate.getHours(),
       minute: startDate.getMinutes(),
-      date: startDate.toISOString().split('T')[0],
+      date: startDate.toISOString().split("T")[0],
       dateTime: parsedDate.start.dateTime,
       timeZone: parsedDate.start.timeZone,
     };
-    
+
     result.end = {
       year: endDate.getFullYear(),
       month: endDate.getMonth() + 1,
       day: endDate.getDate(),
       hour: endDate.getHours(),
       minute: endDate.getMinutes(),
-      date: endDate.toISOString().split('T')[0],
+      date: endDate.toISOString().split("T")[0],
       dateTime: parsedDate.end.dateTime,
       timeZone: parsedDate.end.timeZone,
     };
   } else {
     // 終日イベント
-    const startDate = new Date(parsedDate.start.date + 'T00:00:00');
-    
+    const startDate = new Date(parsedDate.start.date + "T00:00:00");
+
     result.start = {
       year: startDate.getFullYear(),
       month: startDate.getMonth() + 1,
       day: startDate.getDate(),
       date: parsedDate.start.date,
     };
-    
+
     result.end = {
       year: startDate.getFullYear(),
       month: startDate.getMonth() + 1,
@@ -76,47 +76,73 @@ function convertDateParserFormat(parsedDate) {
 function removeDateFromTitle(title, dateText) {
   if (!title || !dateText) return title;
 
-  // 日付パターンをタイトルから除去
-  const datePatterns = [
-    // ISO形式
-    /\d{4}-\d{1,2}-\d{1,2}(?:[T\s]\d{1,2}:\d{2})?/g,
-    // 日本語形式
-    /\d{1,2}月\d{1,2}日(?:\([^)]+\))?(?:\s*\d{1,2}:\d{2}|\d{1,2}時(?:\d{2}分)?)?/g,
-    // スラッシュ形式
-    /(?:\d{4}\/)?\d{1,2}\/\d{1,2}(?:\s+\d{1,2}:\d{2})?/g,
-    // 和暦
-    /令和\d+年\d{1,2}月\d{1,2}日/g,
-    // 英語形式
-    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}(?:\s+\d{1,2}(?:pm|am)?)?/gi,
-    // 時刻のみ
-    /\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM|am|pm))?/g,
-    /\d{1,2}時(?:\d{2}分)?/g,
-    // 開場・開始等の時間表現
-    /(?:開場|開始|受付|開催)\s*\d{1,2}:\d{2}/g,
-    /(?:開場|開始|受付|開催)\s*\d{1,2}時(?:\d{2}分)?/g,
+  let cleanTitle = title;
+
+  // より具体的な日付パターンを除去（年月日時刻の組み合わせ）
+  const specificPatterns = [
+    // 2025年10月23日 (木) 17:30 のような完全な形式
+    /\d{4}年\d{1,2}月\d{1,2}日\s*\([^)]+\)\s*\d{1,2}:\d{2}/g,
+    // 2025年10月23日 (木) のような日付部分
+    /\d{4}年\d{1,2}月\d{1,2}日\s*\([^)]+\)/g,
+    // 10月23日 (木) 17:30 のような部分
+    /\d{1,2}月\d{1,2}日\s*\([^)]+\)\s*\d{1,2}:\d{2}/g,
+    // 10月23日 (木) のような部分
+    /\d{1,2}月\d{1,2}日\s*\([^)]+\)/g,
+    // 17:30 開場18:30 開始 のような時刻表現
+    /\d{1,2}:\d{2}\s*(?:開場|開始|受付|開催)\d{1,2}:\d{2}\s*(?:開場|開始|受付|開催)/g,
+    // 17:30 開場 のような単独時刻表現
+    /\d{1,2}:\d{2}\s*(?:開場|開始|受付|開催)/g,
+    // 18:30 開始 のような単独時刻表現
+    /\d{1,2}:\d{2}\s*(?:開場|開始|受付|開催)/g,
   ];
 
-  let cleanTitle = title;
-  
   // 各パターンで日付を除去
-  for (const pattern of datePatterns) {
-    cleanTitle = cleanTitle.replace(pattern, '');
+  for (const pattern of specificPatterns) {
+    cleanTitle = cleanTitle.replace(pattern, "");
+  }
+
+  // より一般的な日付・時刻パターンも除去
+  const generalPatterns = [
+    // 2025年のような年
+    /\d{4}年/g,
+    // 10月23日のような月日
+    /\d{1,2}月\d{1,2}日/g,
+    // (木)のような曜日
+    /\([月火水木金土日]\)/g,
+    // 17:30のような時刻
+    /\d{1,2}:\d{2}/g,
+  ];
+
+  for (const pattern of generalPatterns) {
+    cleanTitle = cleanTitle.replace(pattern, "");
   }
 
   // 余分な空白やカンマ、括弧を除去
   cleanTitle = cleanTitle
-    .replace(/\s+/g, ' ')
-    .replace(/[,，]\s*/g, ' ')
-    .replace(/^\s*[,，(（]\s*/, '')
-    .replace(/\s*[,，)）]\s*$/, '')
-    .replace(/^\s*[-–—]\s*/, '')
-    .replace(/\s*[-–—]\s*$/, '')
+    .replace(/\s+/g, " ")
+    .replace(/[,，]\s*/g, " ")
+    .replace(/^\s*[,，(（]\s*/, "")
+    .replace(/\s*[,，)）]\s*$/, "")
+    .replace(/^\s*[-–—]\s*/, "")
+    .replace(/\s*[-–—]\s*$/, "")
     .trim();
 
-  // 空になった場合は元のタイトルの最初の部分を使用
-  if (!cleanTitle) {
-    const words = title.split(/\s+/);
-    cleanTitle = words.slice(0, 3).join(' ') || title;
+  // 空になった場合または短すぎる場合は、元のタイトルから日付以外の意味のある部分を抽出
+  if (!cleanTitle || cleanTitle.length < 2) {
+    // 「開場」「開始」などのキーワードを探す
+    const meaningfulWords = title.match(
+      /(?:開場|開始|受付|開催|イベント|コンサート|ライブ|試合|公演|会議|セミナー|講座)/g
+    );
+    if (meaningfulWords && meaningfulWords.length > 0) {
+      cleanTitle = meaningfulWords.join(" ");
+    } else {
+      // 最後の手段として、元のタイトルから数字と記号を除いた最初の3語
+      const words = title
+        .replace(/[\d年月日時分()（）:-]/g, " ")
+        .split(/\s+/)
+        .filter((word) => word.length > 0);
+      cleanTitle = words.slice(0, 3).join(" ") || "イベント";
+    }
   }
 
   return cleanTitle;
@@ -320,12 +346,52 @@ function collectContextInfo(containerElement) {
  * @returns {Promise<object>} 抽出結果
  */
 async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
-  console.log("ChronoClip: Extracting event from selection:", {
-    selectionInfo,
-    contextInfo,
-    pageInfo,
-  });
+  try {
+    // 新しい統合APIを使用
+    if (window.ChronoClipExtractor) {
+      console.log("ChronoClip: Using new unified extraction API");
+      const result = await window.ChronoClipExtractor.extractFromSelection(
+        selectionInfo,
+        contextInfo,
+        pageInfo
+      );
 
+      // 既存のフォーマットに合わせて返却
+      return {
+        dateInfo: result.dateInfo,
+        title: result.title,
+        description: result.description,
+        metadata: result.metadata,
+      };
+    }
+
+    // フォールバック: 既存のロジック
+    console.log("ChronoClip: Using fallback extraction logic");
+    return await extractEventFromSelectionFallback(
+      selectionInfo,
+      contextInfo,
+      pageInfo
+    );
+  } catch (error) {
+    console.error("ChronoClip: Error in extractEventFromSelection:", error);
+    // エラー時のフォールバック
+    return await extractEventFromSelectionFallback(
+      selectionInfo,
+      contextInfo,
+      pageInfo
+    );
+  }
+}
+
+/**
+ * フォールバック用の既存抽出ロジック
+ * 統合APIが利用できない場合の代替処理
+ */
+async function extractEventFromSelectionFallback(
+  selectionInfo,
+  contextInfo,
+  pageInfo
+) {
   try {
     // 1. 日付情報の抽出
     const dateParser = window.ChronoClipDateParser;
@@ -344,8 +410,6 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
       for (const text of textSources) {
         const parsedDate = dateParser.parseDate(text);
         if (parsedDate) {
-          console.log("ChronoClip: Date found in text:", text, parsedDate);
-          
           // date-parser.jsの形式をcontent-script.jsの期待する形式に変換
           dateInfo = convertDateParserFormat(parsedDate);
           dateTextUsed = text;
@@ -354,9 +418,7 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
       }
     } else {
       console.warn("ChronoClip: Date parser not available");
-    }
-
-    // 2. タイトル・詳細の抽出（extractor.jsのロジックを使用）
+    } // 2. タイトル・詳細の抽出（extractor.jsのロジックを使用）
     let eventData = { title: null, description: null };
 
     const extractor = window.ChronoClipExtractor;
@@ -402,7 +464,8 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
     }
 
     // 3. 日時として使用されたテキストをタイトルから除外
-    let cleanTitle = eventData.title || extractTitleFromSelection(selectionInfo, contextInfo);
+    let cleanTitle =
+      eventData.title || extractTitleFromSelection(selectionInfo, contextInfo);
     if (dateTextUsed && cleanTitle) {
       cleanTitle = removeDateFromTitle(cleanTitle, dateTextUsed);
     }
@@ -424,7 +487,6 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
       },
     };
 
-    console.log("ChronoClip: Event extraction result:", result);
     return result;
   } catch (error) {
     console.error("ChronoClip: Error extracting event from selection:", error);
@@ -461,7 +523,7 @@ async function extractEventFromSelection(selectionInfo, contextInfo, pageInfo) {
 function extractTitleFromSelection(selectionInfo, contextInfo) {
   // 1. 見出しがあればそれを優先
   if (contextInfo.heading?.text) {
-    return contextInfo.heading.text;
+    return removeDateFromTitle(contextInfo.heading.text, selectionInfo.text);
   }
 
   // 2. 選択テキストの最初の行または最初の30文字
@@ -469,9 +531,9 @@ function extractTitleFromSelection(selectionInfo, contextInfo) {
   if (selectionText) {
     const firstLine = selectionText.split("\n")[0].trim();
     if (firstLine.length > 0) {
-      return firstLine.length > 30
-        ? firstLine.substring(0, 30) + "..."
-        : firstLine;
+      const title =
+        firstLine.length > 30 ? firstLine.substring(0, 30) + "..." : firstLine;
+      return removeDateFromTitle(title, selectionText);
     }
   }
 
@@ -509,8 +571,6 @@ function extractDescriptionFromSelection(selectionInfo, contextInfo) {
 
 // メッセージリスナー
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("ChronoClip: Selection script received message:", message);
-
   if (message.type === "extract_selection") {
     const { selectionText, pageUrl, pageTitle } = message.payload;
 
@@ -523,7 +583,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // イベント情報を抽出
       extractEventFromSelection(selectionInfo, contextInfo, pageInfo)
         .then((result) => {
-          console.log("ChronoClip: Extraction completed successfully:", result);
           sendResponse({
             success: true,
             data: result,
@@ -550,10 +609,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             },
           };
 
-          console.log(
-            "ChronoClip: Using fallback result in catch:",
-            fallbackResult
-          );
           sendResponse({
             success: true,
             data: fallbackResult,
@@ -570,5 +625,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // 非同期レスポンス
   }
 });
-
-console.log("ChronoClip: Selection script loaded");
