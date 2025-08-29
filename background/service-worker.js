@@ -42,6 +42,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // ...
       break;
 
+    case "settings:updated":
+      // 設定変更をすべてのタブに通知
+      handleSettingsUpdate(message.settings);
+      sendResponse({ success: true });
+      break;
+
     case "auth_login":
       chrome.identity.getAuthToken({ interactive: true }, async (token) => {
         if (chrome.runtime.lastError || !token) {
@@ -289,3 +295,34 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     );
   }
 });
+
+/**
+ * 設定変更をすべてのタブに通知する
+ * @param {Object} settings 更新された設定
+ */
+function handleSettingsUpdate(settings) {
+  console.log(
+    "ChronoClip: Broadcasting settings update to all tabs:",
+    settings
+  );
+
+  // すべてのタブに設定変更を通知
+  chrome.tabs.query({}, (tabs) => {
+    tabs.forEach((tab) => {
+      // content scriptが読み込まれているタブのみに送信
+      chrome.tabs.sendMessage(
+        tab.id,
+        {
+          type: "settings:updated",
+          settings: settings,
+        },
+        (response) => {
+          // レスポンスエラーは無視（content scriptが読み込まれていないタブ等）
+          if (chrome.runtime.lastError) {
+            // ログを出力せず、静かに無視
+          }
+        }
+      );
+    });
+  });
+}

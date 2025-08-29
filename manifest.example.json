@@ -28,6 +28,7 @@
       "js": [
         "config/constants.js",
         "config/site-patterns.js",
+        "lib/settings.js",
         "lib/regex-patterns.js",
         "lib/date-utils.js",
         "lib/date-parser.js",
@@ -43,7 +44,11 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["quick-add-popup.html", "quick-add-popup.css"],
+      "resources": [
+        "quick-add-popup.html",
+        "quick-add-popup.css",
+        "tests/settings-integration-test.html"
+      ],
       "matches": ["<all_urls>"]
     }
   ],
@@ -55,7 +60,10 @@
       "128": "icons/icon128.png"
     }
   },
-  "options_page": "options/options.html",
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

@@ -28,6 +28,84 @@ const ignoreSelectors = [
  */
 
 (function () {
+  // --- 設定管理 ---
+  let currentSettings = null;
+  let isInitialized = false;
+
+  /**
+   * 設定を初期化・購読
+   */
+  async function initializeSettings() {
+    try {
+      currentSettings = await window.ChronoClipSettings.getSettings();
+      console.log(
+        "ChronoClip: Settings loaded in content script:",
+        currentSettings
+      );
+
+      // 設定変更リスナーを登録
+      window.ChronoClipSettings.onSettingsChanged(handleSettingsChanged);
+
+      return currentSettings;
+    } catch (error) {
+      console.error(
+        "ChronoClip: Failed to load settings in content script:",
+        error
+      );
+      currentSettings = window.ChronoClipSettings.getDefaultSettings();
+      return currentSettings;
+    }
+  }
+
+  /**
+   * 設定変更時の処理
+   */
+  function handleSettingsChanged(newSettings) {
+    console.log("ChronoClip: Settings updated in content script:", newSettings);
+    const oldSettings = currentSettings;
+    currentSettings = newSettings;
+
+    // autoDetect設定の変更
+    if (oldSettings && oldSettings.autoDetect !== newSettings.autoDetect) {
+      if (newSettings.autoDetect) {
+        // 自動検出が有効になった - ページをスキャン
+        setTimeout(() => findAndHighlightDates(), 100);
+      } else {
+        // 自動検出が無効になった - ハイライトを削除
+        removeAllHighlights();
+      }
+    }
+
+    // highlightDates設定の変更
+    if (
+      oldSettings &&
+      oldSettings.highlightDates !== newSettings.highlightDates
+    ) {
+      if (!newSettings.highlightDates) {
+        // ハイライト表示が無効になった - ハイライトを削除
+        removeAllHighlights();
+      } else if (newSettings.autoDetect) {
+        // ハイライト表示が有効になった - 再スキャン
+        setTimeout(() => findAndHighlightDates(), 100);
+      }
+    }
+  }
+
+  /**
+   * すべてのハイライトを削除
+   */
+  function removeAllHighlights() {
+    const highlights = document.querySelectorAll(".chronoclip-date");
+    highlights.forEach((highlight) => {
+      const parent = highlight.parentNode;
+      parent.replaceChild(
+        document.createTextNode(highlight.textContent),
+        highlight
+      );
+      parent.normalize();
+    });
+  }
+
   // --- パフォーマンス監視 ---
   const performanceMonitor = {
     startTime: performance.now(),
@@ -311,6 +389,13 @@ const ignoreSelectors = [
       dateSpan.className = "chronoclip-date";
       dateSpan.textContent = match.original;
 
+      // highlightDates設定が無効な場合は見た目のハイライトを適用しない
+      if (!currentSettings.highlightDates) {
+        dateSpan.style.backgroundColor = "transparent";
+        dateSpan.style.border = "none";
+        dateSpan.style.borderRadius = "0";
+      }
+
       // データ属性を設定
       if (match.type === "date") {
         dateSpan.dataset.normalizedDate = match.date;
@@ -320,8 +405,10 @@ const ignoreSelectors = [
         dateSpan.dataset.type = "time";
       }
 
-      // カレンダーアイコンを追加
-      dateSpan.insertAdjacentHTML("beforeend", CALENDAR_ICON_SVG);
+      // highlightDates設定が有効な場合のみカレンダーアイコンを表示
+      if (currentSettings.highlightDates) {
+        dateSpan.insertAdjacentHTML("beforeend", CALENDAR_ICON_SVG);
+      }
 
       // イベントリスナー
       dateSpan.addEventListener("click", (e) => {
@@ -827,6 +914,15 @@ const ignoreSelectors = [
    * ページ全体を走査して日付を検出・処理します。
    */
   function findAndHighlightDates() {
+    // 設定確認：autoDetectまたはhighlightDatesが無効な場合は実行しない
+    if (
+      !currentSettings ||
+      (!currentSettings.autoDetect && !currentSettings.highlightDates)
+    ) {
+      console.log("ChronoClip: Date detection skipped (disabled in settings)");
+      return;
+    }
+
     console.log("ChronoClip: Starting date highlighting...");
 
     // 処理開始時間を記録（パフォーマンス監視）
@@ -942,12 +1038,34 @@ const ignoreSelectors = [
     processBatch();
   }
 
-  // DOMContentLoadedイベントを待ってから処理を開始
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", findAndHighlightDates);
-  } else {
-    findAndHighlightDates();
+  // メイン初期化関数
+  async function initialize() {
+    try {
+      await initializeSettings();
+      isInitialized = true;
+
+      // autoDetect設定が有効な場合のみ日付検出を開始
+      if (currentSettings.autoDetect) {
+        // DOMContentLoadedイベントを待ってから処理を開始
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", findAndHighlightDates);
+        } else {
+          findAndHighlightDates();
+        }
+      }
+
+      console.log(
+        "ChronoClip: Content script initialized. autoDetect =",
+        currentSettings.autoDetect
+      );
+    } catch (error) {
+      console.error("ChronoClip: Failed to initialize content script:", error);
+      isInitialized = true; // エラーでも初期化済みとする
+    }
   }
+
+  // 初期化実行
+  initialize();
 
   // MutationObserverで動的に追加されるコンテンツに対応（デバウンス付き）
   let mutationTimeout = null;
@@ -1100,6 +1218,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   switch (message.type) {
+    case "settings:updated":
+      // バックグラウンドからの設定更新通知
+      if (message.settings) {
+        handleSettingsChanged(message.settings);
+      }
+      sendResponse({ success: true });
+      break;
+
     case "show_toast":
       showToast(message.payload.type, message.payload.message);
       break;
