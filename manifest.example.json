@@ -27,10 +27,15 @@
       "matches": ["<all_urls>"],
       "js": [
         "config/constants.js",
+        "config/site-patterns.js",
         "lib/regex-patterns.js",
         "lib/date-utils.js",
+        "lib/date-parser.js",
         "lib/chrono.min.js",
+        "content/event-detector.js",
+        "content/extractor-api.js",
         "content/extractor.js",
+        "content/selection.js",
         "content/content-script.js"
       ],
       "css": ["content/content.css"]

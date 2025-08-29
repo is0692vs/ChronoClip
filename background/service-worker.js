@@ -176,14 +176,23 @@ function getErrorMessage(err) {
   }
 }
 
-// --- Context Menu for Testing ---
+// --- Context Menu Setup ---
 const CONTEXT_MENU_ID = "chronoclip-test-event";
+const CONTEXT_MENU_SELECTION_ID = "chronoclip-add-selection";
 
 chrome.runtime.onInstalled.addListener(() => {
+  // 既存のテストメニュー
   chrome.contextMenus.create({
     id: CONTEXT_MENU_ID,
     title: "ChronoClip: テストイベント追加",
     contexts: ["page"],
+  });
+
+  // Issue #11: 選択範囲をカレンダーに追加
+  chrome.contextMenus.create({
+    id: CONTEXT_MENU_SELECTION_ID,
+    title: "選択範囲をカレンダーに追加",
+    contexts: ["selection"],
   });
 });
 
@@ -205,6 +214,7 @@ function showToastInActiveTab(type, message) {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === CONTEXT_MENU_ID) {
+    // 既存のテストイベント機能
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const yyyy = tomorrow.getFullYear();
@@ -230,5 +240,52 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         const errorMessage = getErrorMessage(err);
         showToastInActiveTab("error", `エラー: ${errorMessage}`);
       });
+  } else if (info.menuItemId === CONTEXT_MENU_SELECTION_ID) {
+    // Issue #11: 選択範囲をカレンダーに追加
+    console.log(
+      "ChronoClip: Selection menu clicked, selected text:",
+      info.selectionText
+    );
+
+    // content/selection.jsに選択範囲の解析を依頼
+    chrome.tabs.sendMessage(
+      tab.id,
+      {
+        type: "extract_selection",
+        payload: {
+          selectionText: info.selectionText,
+          pageUrl: tab.url,
+          pageTitle: tab.title,
+        },
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "ChronoClip: Error sending message to content script:",
+            chrome.runtime.lastError
+          );
+          showToastInActiveTab("error", "選択範囲の解析でエラーが発生しました");
+          return;
+        }
+
+        console.log("ChronoClip: Selection extraction response:", response);
+
+        if (response && response.success) {
+          // 抽出成功 - クイック追加ポップアップを表示
+          chrome.tabs.sendMessage(tab.id, {
+            type: "show_quick_add_popup",
+            payload: {
+              extractedData: response.data,
+              source: "selection",
+            },
+          });
+        } else {
+          // 抽出失敗 - エラーメッセージを表示
+          const errorMsg =
+            response?.error || "選択範囲からイベント情報を抽出できませんでした";
+          showToastInActiveTab("error", errorMsg);
+        }
+      }
+    );
   }
 });
