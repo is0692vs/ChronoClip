@@ -338,6 +338,257 @@ main {
   background: #218838;
 }
 
+/* サイトルール専用スタイル */
+.hidden {
+  display: none !important;
+}
+
+.current-tab-suggestion {
+  background: #e8f4fd;
+  border: 1px solid #b3d9ff;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.suggestion-text {
+  margin: 0 0 8px 0;
+  color: #0066cc;
+}
+
+.site-rules-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  width: 200px;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.site-rules-list {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fafafa;
+  min-height: 120px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.no-rules-message {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+}
+
+.no-rules-message p {
+  margin: 8px 0;
+}
+
+.site-rule-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+  background: white;
+}
+
+.site-rule-item:last-child {
+  border-bottom: none;
+}
+
+.site-rule-item.disabled {
+  opacity: 0.6;
+  background: #f5f5f5;
+}
+
+.site-rule-info {
+  flex-grow: 1;
+}
+
+.site-rule-domain {
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.site-rule-details {
+  font-size: 12px;
+  color: #666;
+}
+
+.site-rule-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.site-rules-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* サイトルール編集モーダル */
+.site-rule-modal-content {
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #eee;
+  background: #f9f9f9;
+}
+
+.rule-section {
+  margin-bottom: 24px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.rule-section h4 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.field-description {
+  font-size: 12px;
+  color: #666;
+  margin: 4px 0 0 0;
+}
+
+/* 折りたたみセクション */
+.collapsible .collapsible-header {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.collapsible .collapsible-header:hover {
+  color: #4285f4;
+}
+
+.collapsible-icon {
+  transition: transform 0.2s ease;
+}
+
+.collapsible.collapsed .collapsible-icon {
+  transform: rotate(-90deg);
+}
+
+.collapsible-content {
+  margin-top: 16px;
+  transition: max-height 0.3s ease;
+  overflow: hidden;
+}
+
+.collapsible.collapsed .collapsible-content {
+  display: none;
+}
+
+/* ボタンスタイル追加 */
+.danger-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.danger-btn:hover {
+  background: #c82333;
+}
+
+.small-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .site-rule-modal-content {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .site-rules-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .site-rules-actions {
+    flex-direction: column;
+  }
+
+  .site-rule-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .site-rule-actions {
+    justify-content: center;
+  }
+}
+
 .secondary-btn:hover {
   background: #e0e0e0;
   transform: translateY(-1px);

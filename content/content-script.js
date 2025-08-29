@@ -292,6 +292,40 @@ const ignoreSelectors = [
       return;
     }
 
+    // サイト固有設定の取得（サイトルールの無視セレクタチェック）
+    let effectiveSettings = null;
+    try {
+      if (
+        window.ChronoClipSettings &&
+        typeof window.ChronoClipSettings.getEffectiveSettings === "function"
+      ) {
+        effectiveSettings = window.ChronoClipSettings.getEffectiveSettings(
+          window.location.hostname
+        );
+
+        // サイトルールで無視セレクタが指定されている場合、親要素をチェック
+        if (
+          effectiveSettings?.siteRule?.enabled &&
+          effectiveSettings.siteRule.ignoreSelector
+        ) {
+          let parentElement = textNode.parentElement;
+          while (parentElement && parentElement !== document.body) {
+            if (
+              parentElement.matches(effectiveSettings.siteRule.ignoreSelector)
+            ) {
+              return; // 無視セレクタにマッチした場合は処理をスキップ
+            }
+            parentElement = parentElement.parentElement;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "ChronoClip: Error getting effective settings in processTextNode:",
+        error
+      );
+    }
+
     let lastIndex = 0;
     const fragment = document.createDocumentFragment();
     let matchesFound = false;
@@ -928,6 +962,35 @@ const ignoreSelectors = [
     // 処理開始時間を記録（パフォーマンス監視）
     const startTime = performance.now();
 
+    // サイト固有設定の取得
+    let effectiveSettings = null;
+    let additionalIgnoreSelectors = [];
+    try {
+      if (
+        window.ChronoClipSettings &&
+        typeof window.ChronoClipSettings.getEffectiveSettings === "function"
+      ) {
+        effectiveSettings = window.ChronoClipSettings.getEffectiveSettings(
+          window.location.hostname
+        );
+
+        // サイトルールの無視セレクタを追加
+        if (
+          effectiveSettings?.siteRule?.enabled &&
+          effectiveSettings.siteRule.ignoreSelector
+        ) {
+          additionalIgnoreSelectors.push(
+            effectiveSettings.siteRule.ignoreSelector
+          );
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "ChronoClip: Error getting effective settings in findAndHighlightDates:",
+        error
+      );
+    }
+
     // 既に処理済みの要素を避けるためのセレクタ
     const ignoreSelectors = [
       "script",
@@ -945,6 +1008,7 @@ const ignoreSelectors = [
       "input",
       "textarea",
       "select", // フォーム要素
+      ...additionalIgnoreSelectors, // サイト固有の無視セレクタ
     ];
 
     const treeWalker = document.createTreeWalker(

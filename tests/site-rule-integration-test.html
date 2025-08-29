@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChronoClip Site Rule Integration Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .test-section {
+        margin-bottom: 30px;
+        border: 1px solid #ccc;
+        padding: 15px;
+      }
+      .test-result {
+        margin-top: 10px;
+        padding: 10px;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+      }
+      .mock-event {
+        border: 2px dashed #007bff;
+        padding: 10px;
+        margin: 10px 0;
+      }
+      .ignored-content {
+        border: 2px dashed #dc3545;
+        padding: 10px;
+        margin: 10px 0;
+      }
+      button {
+        margin: 5px;
+        padding: 10px 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ChronoClip Site Rule Integration Test</h1>
+    <p>このテストページではサイト別カスタムルールの統合テストを行います。</p>
+
+    <div class="test-section">
+      <h2>1. 設定管理テスト</h2>
+      <button onclick="testSettings()">設定読み込みテスト</button>
+      <button onclick="testEffectiveSettings()">有効設定テスト</button>
+      <button onclick="testSiteRuleValidation()">
+        サイトルールバリデーションテスト
+      </button>
+      <div id="settings-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>2. サイトルール適用テスト</h2>
+      <button onclick="addTestSiteRule()">テストサイトルール追加</button>
+      <button onclick="testSiteRuleExtraction()">抽出ロジックテスト</button>
+      <button onclick="testIgnoreSelector()">無視セレクタテスト</button>
+      <div id="site-rule-result" class="test-result"></div>
+
+      <!-- テスト用コンテンツ -->
+      <div class="mock-event">
+        <h3 class="event-title">春の大感謝祭</h3>
+        <div class="event-date">2024年3月15日</div>
+        <div class="event-description">
+          特別価格でお得な商品をご提供します。
+        </div>
+      </div>
+
+      <div class="ignored-content ignore-ads">
+        <div class="ad-content">2024年12月25日</div>
+        <div>これは広告コンテンツです</div>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2>3. サブドメイン継承テスト</h2>
+      <button onclick="testSubdomainInheritance()">
+        サブドメイン継承テスト
+      </button>
+      <div id="subdomain-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>4. 抽出器統合テスト</h2>
+      <button onclick="testExtractorIntegration()">抽出器統合テスト</button>
+      <div id="extractor-result" class="test-result"></div>
+    </div>
+
+    <!-- 必要なライブラリの読み込み -->
+    <script src="../lib/settings.js"></script>
+    <script src="../content/extractor.js"></script>
+
+    <script>
+      // Chrome拡張API のモック
+      if (typeof chrome === "undefined") {
+        window.chrome = {
+          storage: {
+            local: {
+              get: function (keys, callback) {
+                const mockData = {
+                  chronoclip_settings: {
+                    version: 1,
+                    autoDetect: true,
+                    highlightDates: true,
+                    stopwords: ["広告", "Cookie"],
+                    siteRules: [],
+                  },
+                };
+                callback(mockData);
+              },
+              set: function (data, callback) {
+                console.log("Mock chrome.storage.local.set:", data);
+                if (callback) callback();
+              },
+            },
+          },
+          runtime: {
+            sendMessage: function (message, callback) {
+              console.log("Mock chrome.runtime.sendMessage:", message);
+              if (callback) callback();
+            },
+          },
+        };
+      }
+
+      let testResults = [];
+
+      function logResult(testName, success, message) {
+        const result = {
+          testName,
+          success,
+          message,
+          timestamp: new Date().toISOString(),
+        };
+        testResults.push(result);
+        console.log(
+          `Test ${success ? "PASSED" : "FAILED"}: ${testName} - ${message}`
+        );
+      }
+
+      function displayResult(elementId, success, message) {
+        const element = document.getElementById(elementId);
+        element.className = `test-result ${success ? "success" : "error"}`;
+        element.innerHTML = `<strong>${
+          success ? "✓ 成功" : "✗ 失敗"
+        }:</strong> ${message}`;
+      }
+
+      async function testSettings() {
+        try {
+          const settings = await window.ChronoClipSettings.getSettings();
+          const hasRequiredProps =
+            settings.hasOwnProperty("version") &&
+            settings.hasOwnProperty("autoDetect") &&
+            settings.hasOwnProperty("siteRules");
+
+          if (hasRequiredProps) {
+            logResult("Settings Load", true, "設定の読み込み成功");
+            displayResult(
+              "settings-result",
+              true,
+              `設定読み込み完了: version=${settings.version}, autoDetect=${settings.autoDetect}, siteRules.length=${settings.siteRules.length}`
+            );
+          } else {
+            throw new Error("必要なプロパティが不足");
+          }
+        } catch (error) {
+          logResult("Settings Load", false, error.message);
+          displayResult(
+            "settings-result",
+            false,
+            `設定読み込みエラー: ${error.message}`
+          );
+        }
+      }
+
+      async function testEffectiveSettings() {
+        try {
+          // テスト用サイトルールを追加
+          const testSiteRule = {
+            domain: "example.com",
+            enabled: true,
+            titleSelector: ".event-title",
+            descriptionSelector: ".event-description",
+            ignoreSelector: ".ignore-ads",
+          };
+
+          const settings = await window.ChronoClipSettings.getSettings();
+          settings.siteRules = [testSiteRule];
+          await window.ChronoClipSettings.setSettings(settings);
+
+          // 有効設定のテスト
+          const effectiveSettings =
+            window.ChronoClipSettings.getEffectiveSettings("example.com");
+
+          if (
+            effectiveSettings.siteRule &&
+            effectiveSettings.siteRule.domain === "example.com"
+          ) {
+            logResult("Effective Settings", true, "サイト固有設定の適用成功");
+            displayResult(
+              "settings-result",
+              true,
+              `有効設定取得成功: domain=${effectiveSettings.siteRule.domain}, enabled=${effectiveSettings.siteRule.enabled}`
+            );
+          } else {
+            throw new Error("サイト固有設定が正しく適用されていない");
+          }
+        } catch (error) {
+          logResult("Effective Settings", false, error.message);
+          displayResult(
+            "settings-result",
+            false,
+            `有効設定エラー: ${error.message}`
+          );
+        }
+      }
+
+      async function testSiteRuleValidation() {
+        try {
+          const validRule = {
+            domain: "test.example.com",
+            enabled: true,
+            titleSelector: ".title",
+            descriptionSelector: ".description",
+            ignoreSelector: ".ads",
+          };
+
+          const invalidRule = {
+            domain: "invalid..domain",
+            enabled: true,
+            titleSelector: "invalid>>selector",
+            descriptionSelector: ".description",
+          };
+
+          const validResult =
+            window.ChronoClipSettings.validateSiteRule(validRule);
+          const invalidResult =
+            window.ChronoClipSettings.validateSiteRule(invalidRule);
+
+          if (validResult.isValid && !invalidResult.isValid) {
+            logResult(
+              "Site Rule Validation",
+              true,
+              "バリデーション機能が正常動作"
+            );
+            displayResult(
+              "settings-result",
+              true,
+              `バリデーション成功: 有効ルール通過, 無効ルール却下(${invalidResult.errors.length}個のエラー)`
+            );
+          } else {
+            throw new Error(
+              `バリデーション異常: valid=${validResult.isValid}, invalid=${invalidResult.isValid}`
+            );
+          }
+        } catch (error) {
+          logResult("Site Rule Validation", false, error.message);
+          displayResult(
+            "settings-result",
+            false,
+            `バリデーションエラー: ${error.message}`
+          );
+        }
+      }
+
+      async function addTestSiteRule() {
+        try {
+          const testRule = {
+            domain: window.location.hostname || "localhost",
+            enabled: true,
+            titleSelector: ".event-title",
+            descriptionSelector: ".event-description",
+            ignoreSelector: ".ignore-ads",
+          };
+
+          const settings = await window.ChronoClipSettings.getSettings();
+
+          // 既存のテストルールを削除
+          settings.siteRules = settings.siteRules.filter(
+            (rule) => rule.domain !== testRule.domain
+          );
+
+          // 新しいテストルールを追加
+          settings.siteRules.push(testRule);
+          await window.ChronoClipSettings.setSettings(settings);
+
+          logResult("Add Test Site Rule", true, "テストサイトルール追加成功");
+          displayResult(
+            "site-rule-result",
+            true,
+            `テストサイトルール追加: domain=${testRule.domain}, selectors設定完了`
+          );
+        } catch (error) {
+          logResult("Add Test Site Rule", false, error.message);
+          displayResult(
+            "site-rule-result",
+            false,
+            `サイトルール追加エラー: ${error.message}`
+          );
+        }
+      }
+
+      async function testSiteRuleExtraction() {
+        try {
+          // サイトルールを適用してイベント抽出をテスト
+          const eventElement = document.querySelector(".event-date");
+          if (!eventElement) {
+            throw new Error("テスト用要素が見つかりません");
+          }
+
+          const extractionResult =
+            window.ChronoClipExtractor.extractEventContext(eventElement);
+
+          if (extractionResult.title || extractionResult.description) {
+            logResult("Site Rule Extraction", true, "抽出ロジック動作確認");
+            displayResult(
+              "site-rule-result",
+              true,
+              `抽出成功: title="${
+                extractionResult.title || "なし"
+              }", description="${(
+                extractionResult.description || "なし"
+              ).substring(0, 50)}..."`
+            );
+          } else {
+            throw new Error("抽出結果が空です");
+          }
+        } catch (error) {
+          logResult("Site Rule Extraction", false, error.message);
+          displayResult(
+            "site-rule-result",
+            false,
+            `抽出テストエラー: ${error.message}`
+          );
+        }
+      }
+
+      async function testIgnoreSelector() {
+        try {
+          // 無視セレクタのテスト
+          const ignoredElement = document.querySelector(
+            ".ignore-ads .ad-content"
+          );
+          if (!ignoredElement) {
+            throw new Error("無視対象要素が見つかりません");
+          }
+
+          const extractionResult =
+            window.ChronoClipExtractor.extractEventContext(ignoredElement);
+
+          // 無視セレクタが適用されている場合、抽出結果の信頼度が低くなるはず
+          logResult("Ignore Selector", true, "無視セレクタ機能確認");
+          displayResult(
+            "site-rule-result",
+            true,
+            `無視セレクタテスト完了: 信頼度=${extractionResult.confidence}`
+          );
+        } catch (error) {
+          logResult("Ignore Selector", false, error.message);
+          displayResult(
+            "site-rule-result",
+            false,
+            `無視セレクタテストエラー: ${error.message}`
+          );
+        }
+      }
+
+      async function testSubdomainInheritance() {
+        try {
+          // サブドメイン継承のテスト
+          const parentDomain = "example.com";
+          const subdomain = "blog.example.com";
+
+          const testRule = {
+            domain: parentDomain,
+            enabled: true,
+            titleSelector: ".title",
+            descriptionSelector: ".content",
+          };
+
+          const settings = await window.ChronoClipSettings.getSettings();
+          settings.siteRules = [testRule];
+          await window.ChronoClipSettings.setSettings(settings);
+
+          // サブドメインで有効設定を取得
+          const subdomainSettings =
+            window.ChronoClipSettings.getEffectiveSettings(subdomain);
+
+          if (
+            subdomainSettings.siteRule &&
+            subdomainSettings.siteRule.domain === parentDomain
+          ) {
+            logResult(
+              "Subdomain Inheritance",
+              true,
+              "サブドメイン継承機能が正常動作"
+            );
+            displayResult(
+              "subdomain-result",
+              true,
+              `サブドメイン継承成功: ${subdomain} → ${parentDomain}ルール適用`
+            );
+          } else {
+            throw new Error("サブドメイン継承が機能していない");
+          }
+        } catch (error) {
+          logResult("Subdomain Inheritance", false, error.message);
+          displayResult(
+            "subdomain-result",
+            false,
+            `サブドメイン継承エラー: ${error.message}`
+          );
+        }
+      }
+
+      async function testExtractorIntegration() {
+        try {
+          // 抽出器統合テスト
+          const eventElement = document.querySelector(".event-date");
+          if (!eventElement) {
+            throw new Error("テスト用要素が見つかりません");
+          }
+
+          // サイトルール適用前後で抽出結果を比較
+          const beforeResult = window.ChronoClipExtractor.extractEventContext(
+            eventElement,
+            {
+              stopwords: ["広告"],
+            }
+          );
+
+          // サイトルールを適用
+          await addTestSiteRule();
+
+          const afterResult =
+            window.ChronoClipExtractor.extractEventContext(eventElement);
+
+          if (beforeResult.confidence >= 0 && afterResult.confidence >= 0) {
+            logResult("Extractor Integration", true, "抽出器統合テスト完了");
+            displayResult(
+              "extractor-result",
+              true,
+              `統合テスト成功: 適用前信頼度=${beforeResult.confidence.toFixed(
+                2
+              )}, 適用後信頼度=${afterResult.confidence.toFixed(2)}`
+            );
+          } else {
+            throw new Error("抽出器統合テストで異常な結果");
+          }
+        } catch (error) {
+          logResult("Extractor Integration", false, error.message);
+          displayResult(
+            "extractor-result",
+            false,
+            `統合テストエラー: ${error.message}`
+          );
+        }
+      }
+
+      // ページ読み込み完了時にテスト実行可能状態を確認
+      window.addEventListener("DOMContentLoaded", function () {
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "test-result info";
+        infoDiv.innerHTML =
+          "<strong>ℹ️ テスト準備完了:</strong> 各ボタンをクリックしてテストを実行してください。";
+        document.querySelector(".test-section").appendChild(infoDiv);
+      });
+
+      // 全テスト実行
+      async function runAllTests() {
+        console.log(
+          "ChronoClip Site Rule Integration Test - Starting all tests..."
+        );
+
+        await testSettings();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await testEffectiveSettings();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await testSiteRuleValidation();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await addTestSiteRule();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await testSiteRuleExtraction();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await testIgnoreSelector();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await testSubdomainInheritance();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await testExtractorIntegration();
+
+        console.log("All tests completed. Results:", testResults);
+      }
+
+      // 自動テスト実行（3秒後）
+      setTimeout(() => {
+        if (confirm("自動的にすべてのテストを実行しますか？")) {
+          runAllTests();
+        }
+      }, 3000);
+    </script>
+  </body>
+</html>

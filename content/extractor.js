@@ -523,6 +523,78 @@ function scoreDescriptionCandidate(text, stopwords) {
 }
 
 /**
+ * サイト固有のルールを適用して要素から情報を抽出します
+ * @param {Object} siteRule - サイト固有のルール
+ * @param {HTMLElement} element - 対象要素
+ * @returns {Object|null} 抽出された情報 {title, description, confidence}
+ */
+function applySiteRule(siteRule, element) {
+  if (!siteRule || !element) return null;
+
+  try {
+    const result = {
+      title: null,
+      description: null,
+      confidence: 0,
+      sources: [],
+    };
+
+    // タイトル抽出
+    if (siteRule.titleSelector) {
+      const titleElement =
+        element
+          .closest("article, section, div")
+          ?.querySelector(siteRule.titleSelector) ||
+        document.querySelector(siteRule.titleSelector);
+      if (titleElement) {
+        const titleText = normalizeText(titleElement.textContent);
+        if (titleText && titleText.length >= 3) {
+          result.title = titleText;
+          result.sources.push(`title:${siteRule.titleSelector}`);
+          result.confidence += 0.7;
+        }
+      }
+    }
+
+    // 詳細抽出
+    if (siteRule.descriptionSelector) {
+      const descElement =
+        element
+          .closest("article, section, div")
+          ?.querySelector(siteRule.descriptionSelector) ||
+        document.querySelector(siteRule.descriptionSelector);
+      if (descElement) {
+        const descText = normalizeText(descElement.textContent);
+        if (descText && descText.length >= 10) {
+          result.description =
+            descText.length > 280
+              ? descText.substring(0, 277) + "..."
+              : descText;
+          result.sources.push(`description:${siteRule.descriptionSelector}`);
+          result.confidence += 0.3;
+        }
+      }
+    }
+
+    // 無視セレクターがマッチした場合は結果を無効化
+    if (siteRule.ignoreSelector) {
+      const ignoreElement =
+        element.closest(siteRule.ignoreSelector) ||
+        element.querySelector(siteRule.ignoreSelector);
+      if (ignoreElement) {
+        result.confidence = 0;
+        result.sources.push(`ignored:${siteRule.ignoreSelector}`);
+      }
+    }
+
+    return result.confidence > 0 ? result : null;
+  } catch (error) {
+    console.error("ChronoClip: Error applying site rule:", error, siteRule);
+    return null;
+  }
+}
+
+/**
  * 日付要素の周辺コンテキストからイベント情報を抽出します
  * @param {HTMLElement} dateElement - 日付要素
  * @param {ExtractOptions} [options={}] - 抽出オプション
@@ -537,6 +609,53 @@ function extractEventContext(dateElement, options = {}) {
     stopwords: DEFAULT_STOPWORDS_JA,
     ...options,
   };
+
+  // サイト固有の設定を適用
+  let effectiveSettings = null;
+  if (
+    window.ChronoClipSettings &&
+    typeof window.ChronoClipSettings.getEffectiveSettings === "function"
+  ) {
+    try {
+      effectiveSettings = window.ChronoClipSettings.getEffectiveSettings(
+        window.location.hostname
+      );
+
+      // サイト固有設定でデフォルト値を上書き
+      if (effectiveSettings.EXTRACTION) {
+        opts.maxChars =
+          effectiveSettings.EXTRACTION.MAX_DESCRIPTION_LENGTH || opts.maxChars;
+        opts.headingSearchDepth =
+          effectiveSettings.EXTRACTION.HEADING_SEARCH_DEPTH ||
+          opts.headingSearchDepth;
+      }
+
+      // サイト固有のストップワードをマージ
+      if (
+        effectiveSettings.stopwords &&
+        Array.isArray(effectiveSettings.stopwords)
+      ) {
+        opts.stopwords = [
+          ...new Set([...opts.stopwords, ...effectiveSettings.stopwords]),
+        ];
+      }
+    } catch (error) {
+      console.warn("ChronoClip: Error getting effective settings:", error);
+    }
+  }
+
+  // サイト固有のルールを最優先で適用
+  if (effectiveSettings?.siteRule && effectiveSettings.siteRule.enabled) {
+    const siteRuleResult = applySiteRule(
+      effectiveSettings.siteRule,
+      dateElement
+    );
+    if (siteRuleResult && siteRuleResult.confidence > 0.5) {
+      // 高信頼度のサイトルール結果があれば、それを使用
+      siteRuleResult.sources.push("site-rule");
+      return siteRuleResult;
+    }
+  }
 
   const result = {
     title: null,
@@ -733,6 +852,7 @@ if (typeof module !== "undefined" && module.exports) {
   // Node.js環境（テスト用）
   module.exports = {
     extractEventContext,
+    applySiteRule,
     normalizeText,
     compressJapaneseText,
     findNearestHeading,
@@ -747,6 +867,7 @@ if (typeof module !== "undefined" && module.exports) {
   // ブラウザ環境
   window.ChronoClipExtractor = {
     extractEventContext,
+    applySiteRule,
     normalizeText,
     compressJapaneseText,
     findNearestHeading,
