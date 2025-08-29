@@ -1419,6 +1419,7 @@ function showQuickAddPopupWithData(extractedData) {
       dateTime: extractedData.dateTime,
       date: extractedData.date,
       events: extractedData.events,
+      url: extractedData.url,
     });
 
     if (extractedData.events && extractedData.events.length > 0) {
@@ -1442,13 +1443,10 @@ function showQuickAddPopupWithData(extractedData) {
           );
         }
       }
-      // URLもfirstEventから取得
-      if (firstEvent.url) {
+      // URLもfirstEventから取得（extractedData.urlが未設定の場合のみ）
+      if (firstEvent.url && !extractedData.url) {
         extractedData.url = firstEvent.url;
-        console.log(
-          "ChronoClip: Overwrote URL from first event:",
-          firstEvent.url
-        );
+        console.log("ChronoClip: Set URL from first event:", firstEvent.url);
       }
     } else if (extractedData.dateTime) {
       dateInfo = extractedData.dateTime;
@@ -1734,26 +1732,26 @@ async function showQuickAddPopupForExtractedData(
     }
 
     if (descriptionInput) {
-      let description = eventData.description || "";
+      let description = "";
 
-      console.log("ChronoClip: Setting description:", {
-        originalDescription: description,
+      console.log("ChronoClip: Setting description - debug info:", {
         eventDataUrl: eventData.url,
         currentUrl: window.location.href,
         urlExists: !!eventData.url,
         urlDifferent: eventData.url !== window.location.href,
-        urlNotInDescription: !description.includes(eventData.url),
+        eventDataDescription: eventData.description,
       });
 
-      // URLが別途存在する場合は、詳細フィールドにも追加
-      if (
-        eventData.url &&
-        eventData.url !== window.location.href &&
-        !description.includes(eventData.url)
-      ) {
-        description += `\n\n詳細: ${eventData.url}`;
-        console.log("ChronoClip: Added URL to description:", description);
+      // 後楽園ホール専用抽出器の場合はURLのみを詳細として設定
+      if (eventData.url && eventData.url !== window.location.href) {
+        description = eventData.url;
+        console.log("ChronoClip: Set description to event URL:", description);
+      } else if (eventData.description) {
+        description = eventData.description;
+        console.log("ChronoClip: Using original description:", description);
       }
+
+      console.log("ChronoClip: Final description:", description);
 
       descriptionInput.value = description;
     }

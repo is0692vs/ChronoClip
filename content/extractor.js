@@ -636,6 +636,7 @@ function extractEventContext(dateElement, options = {}) {
           return {
             title: result.title,
             description: result.description,
+            url: result.url, // URLフィールドを追加
             confidence: result.confidence || 0.5,
             sources: result.extractor ? [result.extractor] : ["modular-system"],
             date: result.date,
