@@ -610,6 +610,54 @@ function extractEventContext(dateElement, options = {}) {
     ...options,
   };
 
+  const domain = window.location.hostname;
+
+  // 新しいモジュール化されたシステムを使用
+  if (window.ChronoClipExtractorFactory) {
+    try {
+      const factory = window.ChronoClipExtractorFactory.getExtractorFactory();
+      return factory
+        .extract(dateElement, domain)
+        .then((result) => {
+          // レガシー形式に変換
+          return {
+            title: result.title,
+            description: result.description,
+            confidence: result.confidence || 0.5,
+            sources: result.extractor ? [result.extractor] : ["modular-system"],
+            date: result.date,
+            location: result.location,
+            price: result.price,
+            ruleUsed: result.ruleUsed,
+          };
+        })
+        .catch((error) => {
+          console.warn(
+            "ChronoClip: Modular extraction failed, falling back to legacy:",
+            error
+          );
+          return extractEventContextLegacy(dateElement, opts);
+        });
+    } catch (error) {
+      console.warn(
+        "ChronoClip: Modular system not available, using legacy:",
+        error
+      );
+      return extractEventContextLegacy(dateElement, opts);
+    }
+  }
+
+  // レガシーシステムへのフォールバック
+  return extractEventContextLegacy(dateElement, opts);
+}
+
+/**
+ * レガシー抽出システム（後方互換性のため）
+ * @param {HTMLElement} dateElement - 日付要素
+ * @param {ExtractOptions} options - 抽出オプション
+ * @returns {ExtractResult} 抽出結果
+ */
+function extractEventContextLegacy(dateElement, options) {
   // サイト固有の設定を適用
   let effectiveSettings = null;
   if (
@@ -852,6 +900,7 @@ if (typeof module !== "undefined" && module.exports) {
   // Node.js環境（テスト用）
   module.exports = {
     extractEventContext,
+    extractEventContextLegacy,
     applySiteRule,
     normalizeText,
     compressJapaneseText,
@@ -867,6 +916,7 @@ if (typeof module !== "undefined" && module.exports) {
   // ブラウザ環境
   window.ChronoClipExtractor = {
     extractEventContext,
+    extractEventContextLegacy,
     applySiteRule,
     normalizeText,
     compressJapaneseText,

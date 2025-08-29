@@ -20,16 +20,151 @@ let sortableInstance = null;
 let elements = {};
 
 /**
+ * 堅牢な要素取得ヘルパー関数
+ * @param {string} elementId - 要素のID
+ * @param {string} elementName - 要素の説明名（ログ用）
+ * @returns {HTMLElement|null} 要素またはnull
+ */
+function getElementSafe(elementId, elementName = null) {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.warn(
+      `ChronoClip: Element not found: ${elementId} (${
+        elementName || elementId
+      })`
+    );
+  }
+  return element;
+}
+
+/**
+ * 要素の存在を確認し、見つからない場合は再取得を試行
+ * @param {string} key - elements オブジェクトのキー
+ * @param {string} elementId - DOM要素のID
+ * @param {string} description - 要素の説明
+ */
+function ensureElement(key, elementId, description) {
+  if (!elements[key]) {
+    console.log(`ChronoClip: Re-acquiring ${description} (${elementId})`);
+    elements[key] = getElementSafe(elementId, description);
+
+    if (elements[key]) {
+      console.log(`ChronoClip: Successfully acquired ${description}`);
+    } else {
+      console.error(`ChronoClip: Failed to acquire ${description} after retry`);
+    }
+  }
+  return elements[key];
+}
+
+/**
  * ページ読み込み時の初期化
  */
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("ChronoClip: Options page loaded");
 
   try {
+    // DOM要素の初期化を最初に行う
     initializeElements();
+
+    // 設定ライブラリの初期化を待つ（タイムアウト付き）
+    if (!window.ChronoClipSettings) {
+      console.log("ChronoClip: Waiting for settings library...");
+      await new Promise((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 100; // 5秒でタイムアウト
+
+        const checkSettings = () => {
+          attempts++;
+          if (window.ChronoClipSettings) {
+            console.log(
+              "ChronoClip: Settings library loaded after",
+              attempts * 50,
+              "ms"
+            );
+            resolve();
+          } else if (attempts >= maxAttempts) {
+            console.error("ChronoClip: Settings library loading timed out");
+            reject(new Error("Settings library loading timed out"));
+          } else {
+            setTimeout(checkSettings, 50);
+          }
+        };
+        checkSettings();
+      });
+    }
+
+    console.log(
+      "ChronoClip: window.ChronoClipSettings:",
+      window.ChronoClipSettings
+    );
+    console.log(
+      "ChronoClip: Available methods:",
+      Object.keys(window.ChronoClipSettings || {})
+    );
+
+    // 新しいモジュールシステムの確認
+    console.log("ChronoClip: Checking new module system...");
+    console.log(
+      "ChronoClip: window.ChronoClipSiteRuleManager:",
+      window.ChronoClipSiteRuleManager
+    );
+    console.log(
+      "ChronoClip: window.ChronoClipExtractorFactory:",
+      window.ChronoClipExtractorFactory
+    );
+
+    // SiteRuleManagerの初期化テスト
+    if (window.ChronoClipSiteRuleManager) {
+      try {
+        const siteRuleManager =
+          window.ChronoClipSiteRuleManager.getSiteRuleManager();
+        await siteRuleManager.initialize();
+        console.log("ChronoClip: SiteRuleManager initialized successfully");
+        console.log(
+          "ChronoClip: Available site rules:",
+          siteRuleManager.getAllRules()
+        );
+      } catch (error) {
+        console.error(
+          "ChronoClip: SiteRuleManager initialization failed:",
+          error
+        );
+      }
+    } else {
+      console.warn("ChronoClip: SiteRuleManager not loaded");
+    }
+
+    // ExtractorFactoryの初期化テスト
+    if (window.ChronoClipExtractorFactory) {
+      try {
+        const extractorFactory =
+          window.ChronoClipExtractorFactory.getExtractorFactory();
+        extractorFactory.initialize();
+        console.log("ChronoClip: ExtractorFactory initialized successfully");
+        console.log(
+          "ChronoClip: Available extractors:",
+          extractorFactory.getAvailableExtractors()
+        );
+      } catch (error) {
+        console.error(
+          "ChronoClip: ExtractorFactory initialization failed:",
+          error
+        );
+      }
+    } else {
+      console.warn("ChronoClip: ExtractorFactory not loaded");
+    }
+
     await loadSettings();
     initializeEventListeners();
     updateUI();
+
+    // 現在のタブ情報を取得（Chrome拡張機能の場合）
+    if (typeof chrome !== "undefined" && chrome.tabs) {
+      await getCurrentTabInfo();
+    }
+
     console.log("ChronoClip: Options initialization complete");
   } catch (error) {
     console.error("ChronoClip: Options initialization failed:", error);
@@ -41,66 +176,181 @@ document.addEventListener("DOMContentLoaded", async () => {
  * DOM要素の参照を取得
  */
 function initializeElements() {
+  console.log("ChronoClip: Initializing DOM elements...");
+
+  // 各要素の安全な取得
   elements = {
-    form: document.getElementById("settingsForm"),
-    autoDetect: document.getElementById("autoDetect"),
-    highlightDates: document.getElementById("highlightDates"),
-    includeURL: document.getElementById("includeURL"),
-    defaultDuration: document.getElementById("defaultDuration"),
-    defaultCalendar: document.getElementById("defaultCalendar"),
-    timezone: document.getElementById("timezone"),
-    dateFormatsContainer: document.getElementById("dateFormatsContainer"),
-    rulesEnabled: document.getElementById("rulesEnabled"),
-    siteRulesContainer: document.getElementById("siteRulesContainer"),
-    siteRulesList: document.getElementById("siteRulesList"),
-    addSiteRuleBtn: document.getElementById("addSiteRuleBtn"),
-    saveBtn: document.getElementById("saveBtn"),
-    resetBtn: document.getElementById("resetBtn"),
-    toastContainer: document.getElementById("toastContainer"),
-    confirmModal: document.getElementById("confirmModal"),
-    confirmTitle: document.getElementById("confirmTitle"),
-    confirmMessage: document.getElementById("confirmMessage"),
-    confirmOk: document.getElementById("confirmOk"),
-    confirmCancel: document.getElementById("confirmCancel"),
+    form: getElementSafe("settingsForm", "main form"),
+    autoDetect: getElementSafe("autoDetect", "auto detect checkbox"),
+    highlightDates: getElementSafe(
+      "highlightDates",
+      "highlight dates checkbox"
+    ),
+    includeURL: getElementSafe("includeURL", "include URL checkbox"),
+    defaultDuration: getElementSafe(
+      "defaultDuration",
+      "default duration input"
+    ),
+    defaultCalendar: getElementSafe(
+      "defaultCalendar",
+      "default calendar select"
+    ),
+    timezone: getElementSafe("timezone", "timezone select"),
+    dateFormatsContainer: getElementSafe(
+      "dateFormatsContainer",
+      "date formats container"
+    ),
+    rulesEnabled: getElementSafe("rulesEnabled", "rules enabled checkbox"),
+    siteRulesContainer: getElementSafe(
+      "siteRulesContainer",
+      "site rules container"
+    ),
+    siteRulesList: getElementSafe("siteRulesList", "site rules list"),
+    addSiteRuleBtn: getElementSafe("addSiteRuleBtn", "add site rule button"),
+    saveBtn: getElementSafe("saveBtn", "save button"),
+    resetBtn: getElementSafe("resetBtn", "reset button"),
+    toastContainer: getElementSafe("toastContainer", "toast container"),
+    confirmModal: getElementSafe("confirmModal", "confirm modal"),
+    confirmTitle: getElementSafe("confirmTitle", "confirm title"),
+    confirmMessage: getElementSafe("confirmMessage", "confirm message"),
+    confirmOk: getElementSafe("confirmOk", "confirm OK button"),
+    confirmCancel: getElementSafe("confirmCancel", "confirm cancel button"),
 
     // サイトルール関連要素
-    currentTabSuggestion: document.getElementById("currentTabSuggestion"),
-    currentTabDomain: document.getElementById("currentTabDomain"),
-    addCurrentSiteBtn: document.getElementById("addCurrentSiteBtn"),
-    siteRuleSearch: document.getElementById("siteRuleSearch"),
-    noRulesMessage: document.getElementById("noRulesMessage"),
-    exportSiteRulesBtn: document.getElementById("exportSiteRulesBtn"),
-    importSiteRulesBtn: document.getElementById("importSiteRulesBtn"),
-    importSiteRulesInput: document.getElementById("importSiteRulesInput"),
+    currentTabSuggestion: getElementSafe(
+      "currentTabSuggestion",
+      "current tab suggestion"
+    ),
+    currentTabDomain: getElementSafe("currentTabDomain", "current tab domain"),
+    addCurrentSiteBtn: getElementSafe(
+      "addCurrentSiteBtn",
+      "add current site button"
+    ),
+    siteRuleSearch: getElementSafe("siteRuleSearch", "site rule search input"),
+    noRulesMessage: getElementSafe("noRulesMessage", "no rules message"),
+    exportSiteRulesBtn: getElementSafe(
+      "exportSiteRulesBtn",
+      "export site rules button"
+    ),
+    importSiteRulesBtn: getElementSafe(
+      "importSiteRulesBtn",
+      "import site rules button"
+    ),
+    importSiteRulesInput: getElementSafe(
+      "importSiteRulesInput",
+      "import site rules input"
+    ),
 
     // サイトルールモーダル関連
-    siteRuleModal: document.getElementById("siteRuleModal"),
-    closeSiteRuleModal: document.getElementById("closeSiteRuleModal"),
-    siteRuleForm: document.getElementById("siteRuleForm"),
-    saveSiteRuleBtn: document.getElementById("saveSiteRuleBtn"),
-    deleteSiteRuleBtn: document.getElementById("deleteSiteRuleBtn"),
-    testSiteRuleBtn: document.getElementById("testSiteRuleBtn"),
+    siteRuleModal: getElementSafe("siteRuleModal", "site rule modal"),
+    closeSiteRuleModal: getElementSafe(
+      "closeSiteRuleModal",
+      "close site rule modal button"
+    ),
+    siteRuleForm: getElementSafe("siteRuleForm", "site rule form"),
+    saveSiteRuleBtn: getElementSafe("saveSiteRuleBtn", "save site rule button"),
+    deleteSiteRuleBtn: getElementSafe(
+      "deleteSiteRuleBtn",
+      "delete site rule button"
+    ),
+    testSiteRuleBtn: getElementSafe("testSiteRuleBtn", "test site rule button"),
 
     // サイトルールフォーム項目
-    ruleDomain: document.getElementById("ruleDomain"),
-    ruleEnabled: document.getElementById("ruleEnabled"),
-    ruleInheritSubdomains: document.getElementById("ruleInheritSubdomains"),
-    ruleDateAnchor: document.getElementById("ruleDateAnchor"),
-    ruleDateBlock: document.getElementById("ruleDateBlock"),
-    ruleTitleSelector: document.getElementById("ruleTitleSelector"),
-    ruleTitleFallback: document.getElementById("ruleTitleFallback"),
-    ruleDescSelectors: document.getElementById("ruleDescSelectors"),
-    ruleMaxBlocks: document.getElementById("ruleMaxBlocks"),
-    ruleIncludeURL: document.getElementById("ruleIncludeURL"),
-    ruleLocationSelector: document.getElementById("ruleLocationSelector"),
-    ruleTimeStart: document.getElementById("ruleTimeStart"),
-    ruleTimeEnd: document.getElementById("ruleTimeEnd"),
-    rulePreferDateTime: document.getElementById("rulePreferDateTime"),
-    ruleRemoveSelectors: document.getElementById("ruleRemoveSelectors"),
-    ruleStopwords: document.getElementById("ruleStopwords"),
-    ruleCustomJoiner: document.getElementById("ruleCustomJoiner"),
-    ruleTrimBrackets: document.getElementById("ruleTrimBrackets"),
+    ruleDomain: getElementSafe("ruleDomain", "rule domain input"),
+    ruleEnabled: getElementSafe("ruleEnabled", "rule enabled checkbox"),
+    ruleInheritSubdomains: getElementSafe(
+      "ruleInheritSubdomains",
+      "rule inherit subdomains checkbox"
+    ),
+    ruleDateAnchor: getElementSafe("ruleDateAnchor", "rule date anchor input"),
+    ruleDateBlock: getElementSafe("ruleDateBlock", "rule date block input"),
+    ruleTitleSelector: getElementSafe(
+      "ruleTitleSelector",
+      "rule title selector input"
+    ),
+    ruleTitleFallback: getElementSafe(
+      "ruleTitleFallback",
+      "rule title fallback checkbox"
+    ),
+    ruleDescSelectors: getElementSafe(
+      "ruleDescSelectors",
+      "rule description selectors textarea"
+    ),
+    ruleMaxBlocks: getElementSafe("ruleMaxBlocks", "rule max blocks input"),
+    ruleIncludeURL: getElementSafe("ruleIncludeURL", "rule include URL select"),
+    ruleLocationSelector: getElementSafe(
+      "ruleLocationSelector",
+      "rule location selector input"
+    ),
+    ruleTimeStart: getElementSafe("ruleTimeStart", "rule time start input"),
+    ruleTimeEnd: getElementSafe("ruleTimeEnd", "rule time end input"),
+    rulePreferDateTime: getElementSafe(
+      "rulePreferDateTime",
+      "rule prefer datetime checkbox"
+    ),
+    ruleRemoveSelectors: getElementSafe(
+      "ruleRemoveSelectors",
+      "rule remove selectors textarea"
+    ),
+    ruleStopwords: getElementSafe("ruleStopwords", "rule stopwords textarea"),
+    ruleCustomJoiner: getElementSafe(
+      "ruleCustomJoiner",
+      "rule custom joiner input"
+    ),
+    ruleTrimBrackets: getElementSafe(
+      "ruleTrimBrackets",
+      "rule trim brackets checkbox"
+    ),
   };
+
+  // 重要な要素の存在確認とデバッグ
+  const criticalElements = ["siteRuleForm", "siteRuleModal", "ruleDomain"];
+  console.log("ChronoClip: Checking critical elements...");
+
+  let missingElements = [];
+  for (const key of criticalElements) {
+    const element = elements[key];
+    const elementId =
+      key === "siteRuleForm"
+        ? "siteRuleForm"
+        : key === "siteRuleModal"
+        ? "siteRuleModal"
+        : key === "ruleDomain"
+        ? "ruleDomain"
+        : key;
+
+    console.log(
+      `ChronoClip: Element ${key} - stored:`,
+      element ? "found" : "missing"
+    );
+
+    if (!element) {
+      missingElements.push({ key, elementId });
+      console.error(
+        `ChronoClip: Critical element not found in elements object: ${key}`
+      );
+    } else {
+      console.log(`ChronoClip: Found element: ${key} = `, element.tagName);
+    }
+  }
+
+  // 欠けている要素の統計
+  const totalElements = Object.keys(elements).length;
+  const foundElements = Object.values(elements).filter(
+    (el) => el !== null
+  ).length;
+  console.log(
+    `ChronoClip: Elements summary: ${foundElements}/${totalElements} found`
+  );
+
+  if (missingElements.length > 0) {
+    console.warn(
+      `ChronoClip: Missing ${missingElements.length} critical elements:`,
+      missingElements
+    );
+  }
+
+  console.log("ChronoClip: Elements initialization complete");
 }
 
 /**
@@ -124,33 +374,164 @@ async function loadSettings() {
  * イベントリスナーを初期化
  */
 function initializeEventListeners() {
-  // フォーム送信
-  elements.form.addEventListener("submit", handleSave);
+  console.log("ChronoClip: Initializing event listeners...");
+
+  // 安全なイベントリスナー追加
+  function addSafeEventListener(elementName, eventType, handler, description) {
+    const element = elements[elementName];
+    if (element) {
+      element.addEventListener(eventType, handler);
+      console.log(`ChronoClip: Added ${eventType} listener to ${description}`);
+    } else {
+      console.warn(
+        `ChronoClip: Could not add ${eventType} listener to ${description} - element not found`
+      );
+    }
+  }
+
+  // フォーム送信の詳細デバッグ
+  if (elements.form) {
+    console.log("ChronoClip: Registering form submit handler");
+    elements.form.addEventListener("submit", handleSave);
+
+    // フォームの状態確認
+    console.log("ChronoClip: Form element details:", {
+      id: elements.form.id,
+      tagName: elements.form.tagName,
+      method: elements.form.method,
+      action: elements.form.action,
+    });
+  } else {
+    console.error(
+      "ChronoClip: elements.form is null - submit handler not registered!"
+    );
+    // 代替手段：直接クエリでフォームを取得してリスナーを登録
+    const formDirect = document.getElementById("settingsForm");
+    if (formDirect) {
+      console.log(
+        "ChronoClip: Found form by direct query, registering listener"
+      );
+      elements.form = formDirect;
+      formDirect.addEventListener("submit", handleSave);
+    } else {
+      console.error("ChronoClip: settingsForm not found in DOM!");
+    }
+  }
+
+  // saveBtn の詳細確認
+  if (elements.saveBtn) {
+    console.log("ChronoClip: saveBtn found:", elements.saveBtn);
+    console.log("ChronoClip: saveBtn type:", elements.saveBtn.type);
+    console.log("ChronoClip: saveBtn form:", elements.saveBtn.form);
+
+    // onclick イベントも追加登録（念のため）
+    elements.saveBtn.addEventListener("click", (e) => {
+      console.log("ChronoClip: saveBtn clicked directly");
+      console.log("ChronoClip: Button type:", elements.saveBtn.type);
+      console.log("ChronoClip: Button form:", elements.saveBtn.form);
+      console.log("ChronoClip: elements.form:", elements.form);
+
+      // 確実にhandleSaveを呼ぶ（フォームsubmitと重複してもpreventDefaultで制御）
+      console.log("ChronoClip: Calling handleSave from click event");
+      handleSave(e);
+    });
+  } else {
+    console.error("ChronoClip: elements.saveBtn is null!");
+    const saveBtnDirect = document.getElementById("saveBtn");
+    if (saveBtnDirect) {
+      console.log("ChronoClip: Found saveBtn by direct query");
+      elements.saveBtn = saveBtnDirect;
+      saveBtnDirect.addEventListener("click", handleSave);
+    }
+  }
 
   // リセットボタン
-  elements.resetBtn.addEventListener("click", handleReset);
+  addSafeEventListener("resetBtn", "click", handleReset, "reset button");
 
   // サイトルール関連
-  elements.rulesEnabled.addEventListener("change", handleRulesEnabledChange);
-  elements.addSiteRuleBtn.addEventListener("click", () => openSiteRuleModal());
-  elements.addCurrentSiteBtn.addEventListener("click", addCurrentSiteRule);
-  elements.siteRuleSearch.addEventListener("input", filterSiteRules);
-  elements.exportSiteRulesBtn.addEventListener("click", exportSiteRules);
-  elements.importSiteRulesBtn.addEventListener("click", () =>
-    elements.importSiteRulesInput.click()
+  addSafeEventListener(
+    "rulesEnabled",
+    "change",
+    handleRulesEnabledChange,
+    "rules enabled checkbox"
   );
-  elements.importSiteRulesInput.addEventListener("change", importSiteRules);
+  addSafeEventListener(
+    "addSiteRuleBtn",
+    "click",
+    () => openSiteRuleModal(),
+    "add site rule button"
+  );
+  addSafeEventListener(
+    "addCurrentSiteBtn",
+    "click",
+    addCurrentSiteRule,
+    "add current site button"
+  );
+  addSafeEventListener(
+    "siteRuleSearch",
+    "input",
+    filterSiteRules,
+    "site rule search input"
+  );
+
+  // インポート・エクスポート関連
+  addSafeEventListener(
+    "exportSiteRulesBtn",
+    "click",
+    exportSiteRules,
+    "export site rules button"
+  );
+  addSafeEventListener(
+    "importSiteRulesBtn",
+    "click",
+    () => {
+      if (elements.importSiteRulesInput) {
+        elements.importSiteRulesInput.click();
+      }
+    },
+    "import site rules button"
+  );
+  addSafeEventListener(
+    "importSiteRulesInput",
+    "change",
+    importSiteRules,
+    "import site rules input"
+  );
 
   // サイトルールモーダル関連
-  elements.closeSiteRuleModal.addEventListener("click", closeSiteRuleModal);
-  elements.saveSiteRuleBtn.addEventListener("click", saveSiteRule);
-  elements.deleteSiteRuleBtn.addEventListener("click", deleteSiteRule);
-  elements.testSiteRuleBtn.addEventListener("click", testSiteRule);
-  elements.siteRuleModal.addEventListener("click", (e) => {
-    if (e.target === elements.siteRuleModal) {
-      closeSiteRuleModal();
-    }
-  });
+  addSafeEventListener(
+    "closeSiteRuleModal",
+    "click",
+    closeSiteRuleModal,
+    "close site rule modal button"
+  );
+  addSafeEventListener(
+    "saveSiteRuleBtn",
+    "click",
+    saveSiteRule,
+    "save site rule button"
+  );
+  addSafeEventListener(
+    "deleteSiteRuleBtn",
+    "click",
+    deleteSiteRule,
+    "delete site rule button"
+  );
+  addSafeEventListener(
+    "testSiteRuleBtn",
+    "click",
+    testSiteRule,
+    "test site rule button"
+  );
+
+  // モーダル外クリックで閉じる
+  if (elements.siteRuleModal) {
+    elements.siteRuleModal.addEventListener("click", (e) => {
+      if (e.target === elements.siteRuleModal) {
+        closeSiteRuleModal();
+      }
+    });
+  }
 
   // 折りたたみセクション
   document.querySelectorAll(".collapsible-header").forEach((header) => {
@@ -158,20 +539,63 @@ function initializeEventListeners() {
   });
 
   // 設定変更検知
-  elements.form.addEventListener("input", () => {
-    isDirty = true;
-    updateSaveButtonState();
-  });
+  if (elements.form) {
+    elements.form.addEventListener("input", () => {
+      isDirty = true;
+      updateSaveButtonState();
+    });
+  }
 
   // モーダル関連
-  elements.confirmOk.addEventListener("click", handleConfirmOk);
-  elements.confirmCancel.addEventListener("click", hideConfirmModal);
+  addSafeEventListener(
+    "confirmOk",
+    "click",
+    handleConfirmOk,
+    "confirm OK button"
+  );
+  addSafeEventListener(
+    "confirmCancel",
+    "click",
+    hideConfirmModal,
+    "confirm cancel button"
+  );
 
   // ページ離脱前の確認
   window.addEventListener("beforeunload", handleBeforeUnload);
 
+  // サイトルールアクションボタンのイベント委譲
+  if (elements.siteRulesList) {
+    elements.siteRulesList.addEventListener("click", (e) => {
+      const button = e.target.closest("[data-action]");
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const domain = button.dataset.domain;
+
+      switch (action) {
+        case "toggle":
+          toggleSiteRule(domain);
+          break;
+        case "edit":
+          editSiteRule(domain);
+          break;
+        case "delete":
+          confirmDeleteSiteRule(domain);
+          break;
+      }
+    });
+  }
+
   // 現在のタブ情報を取得
   getCurrentTabInfo();
+
+  // テストページボタン
+  const openTestPageBtn = document.getElementById("openTestPageBtn");
+  if (openTestPageBtn) {
+    openTestPageBtn.addEventListener("click", openTestPage);
+  }
+
+  console.log("ChronoClip: Event listeners initialization complete");
 }
 
 /**
@@ -502,14 +926,41 @@ function handleRulesEnabledChange() {
  * 設定保存の処理
  */
 async function handleSave(e) {
-  e.preventDefault();
+  console.log("ChronoClip: ===== handleSave function called =====");
+  console.log("ChronoClip: Event object:", e);
+  console.log("ChronoClip: Event type:", e?.type);
+  console.log("ChronoClip: Event target:", e?.target);
+  console.log("ChronoClip: Current time:", new Date().toISOString());
+
+  if (e) {
+    e.preventDefault();
+    console.log("ChronoClip: preventDefault() called");
+  }
 
   try {
+    console.log("ChronoClip: Starting settings save...");
+
+    // window.ChronoClipSettings の存在確認
+    if (!window.ChronoClipSettings) {
+      console.error("ChronoClip: window.ChronoClipSettings is not available!");
+      showToast("設定システムが利用できません", "error");
+      return;
+    }
+
+    console.log(
+      "ChronoClip: window.ChronoClipSettings available:",
+      typeof window.ChronoClipSettings
+    );
+
     // フォームから設定を取得
+    console.log("ChronoClip: Calling getSettingsFromForm...");
     const formSettings = getSettingsFromForm();
+    console.log("ChronoClip: Form settings:", formSettings);
 
     // バリデーション
     const validation = window.ChronoClipSettings.validateSettings(formSettings);
+    console.log("ChronoClip: Validation result:", validation);
+
     if (!validation.isValid) {
       const errors = validation.errors
         .map((e) => `${e.field}: ${e.message}`)
@@ -519,10 +970,14 @@ async function handleSave(e) {
     }
 
     // 保存実行
-    elements.saveBtn.disabled = true;
-    elements.saveBtn.textContent = "保存中...";
+    if (elements.saveBtn) {
+      elements.saveBtn.disabled = true;
+      elements.saveBtn.textContent = "保存中...";
+    }
 
+    console.log("ChronoClip: Calling setSettings...");
     await window.ChronoClipSettings.setSettings(formSettings);
+
     currentSettings = formSettings;
     isDirty = false;
     updateSaveButtonState();
@@ -533,8 +988,10 @@ async function handleSave(e) {
     console.error("ChronoClip: Failed to save settings:", error);
     showToast(`保存に失敗しました: ${error.message}`, "error");
   } finally {
-    elements.saveBtn.disabled = false;
-    elements.saveBtn.textContent = "設定を保存";
+    if (elements.saveBtn) {
+      elements.saveBtn.disabled = false;
+      elements.saveBtn.textContent = "設定を保存";
+    }
   }
 }
 
@@ -542,7 +999,7 @@ async function handleSave(e) {
  * フォームから設定オブジェクトを取得
  */
 function getSettingsFromForm() {
-  return {
+  const settings = {
     ...currentSettings,
     autoDetect: elements.autoDetect.checked,
     highlightDates: elements.highlightDates.checked,
@@ -553,6 +1010,26 @@ function getSettingsFromForm() {
     rulesEnabled: elements.rulesEnabled.checked,
     // dateFormats と siteRules は既に currentSettings に反映済み
   };
+
+  // 新しいモジュール化システムとの同期
+  if (window.ChronoClipSiteRuleManager) {
+    try {
+      const siteRuleManager =
+        window.ChronoClipSiteRuleManager.getSiteRuleManager();
+      // サイトルール管理クラスのルールも取得して統合
+      const moduleRules = siteRuleManager.getAllRules();
+      if (moduleRules && Object.keys(moduleRules).length > 0) {
+        settings.siteRules = {
+          ...settings.siteRules,
+          ...moduleRules,
+        };
+      }
+    } catch (error) {
+      console.log("サイトルール管理クラスとの同期に失敗:", error);
+    }
+  }
+
+  return settings;
 }
 
 /**
@@ -600,6 +1077,20 @@ function handleBeforeUnload(e) {
  * トースト通知を表示
  */
 function showToast(message, type = "info") {
+  console.log(`ChronoClip Toast [${type}]: ${message}`);
+
+  // toastContainer要素の存在確認
+  if (!elements.toastContainer) {
+    const container = document.getElementById("toastContainer");
+    if (container) {
+      elements.toastContainer = container;
+    } else {
+      console.error("ChronoClip: toastContainer not found, using console log");
+      console.log(`Toast message: ${message}`);
+      return;
+    }
+  }
+
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
@@ -668,14 +1159,22 @@ function openTestPage() {
 async function getCurrentTabInfo() {
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs.length > 0) {
-      const url = new URL(tabs[0].url);
-      const domain = url.hostname;
+    if (tabs.length > 0 && tabs[0].url) {
+      try {
+        const url = new URL(tabs[0].url);
+        const domain = url.hostname;
 
-      // chrome:// や file:// などは除外
-      if (url.protocol === "http:" || url.protocol === "https:") {
-        elements.currentTabDomain.textContent = domain;
-        elements.currentTabSuggestion.classList.remove("hidden");
+        // chrome:// や file:// などは除外
+        if (url.protocol === "http:" || url.protocol === "https:") {
+          if (elements.currentTabDomain) {
+            elements.currentTabDomain.textContent = domain;
+          }
+          if (elements.currentTabSuggestion) {
+            elements.currentTabSuggestion.classList.remove("hidden");
+          }
+        }
+      } catch (urlError) {
+        console.log("URL解析に失敗:", urlError);
       }
     }
   } catch (error) {
@@ -686,52 +1185,76 @@ async function getCurrentTabInfo() {
 /**
  * サイトルール一覧UIを更新
  */
-function updateSiteRulesUI() {
-  const siteRules = currentSettings.siteRules || {};
-  const ruleEntries = Object.entries(siteRules);
+async function updateSiteRulesUI() {
+  try {
+    let siteRules = currentSettings.siteRules || {};
 
-  if (ruleEntries.length === 0) {
-    elements.siteRulesList.innerHTML =
-      '<div class="no-rules-message"><p>まだサイトルールが設定されていません。</p><p>「新しいルールを追加」ボタンまたは現在のタブの提案からルールを作成してください。</p></div>';
-    elements.noRulesMessage.classList.remove("hidden");
-    return;
-  }
+    // 新しいモジュール化システムからもルールを取得して統合
+    if (window.ChronoClipSiteRuleManager) {
+      const siteRuleManager =
+        window.ChronoClipSiteRuleManager.getSiteRuleManager();
+      await siteRuleManager.initialize();
+      const moduleRules = siteRuleManager.getAllRules();
+      if (moduleRules && Object.keys(moduleRules).length > 0) {
+        siteRules = { ...siteRules, ...moduleRules };
+      }
+    }
 
-  elements.noRulesMessage.classList.add("hidden");
+    const ruleEntries = Object.entries(siteRules);
 
-  const searchTerm = elements.siteRuleSearch.value.toLowerCase();
-  const filteredRules = ruleEntries.filter(([domain]) =>
-    domain.toLowerCase().includes(searchTerm)
-  );
+    if (ruleEntries.length === 0) {
+      elements.siteRulesList.innerHTML =
+        '<div class="no-rules-message"><p>まだサイトルールが設定されていません。</p><p>「新しいルールを追加」ボタンまたは現在のタブの提案からルールを作成してください。</p></div>';
+      if (elements.noRulesMessage) {
+        elements.noRulesMessage.classList.remove("hidden");
+      }
+      return;
+    }
 
-  elements.siteRulesList.innerHTML = filteredRules
-    .map(
-      ([domain, rule]) => `
-    <div class="site-rule-item ${
-      rule.enabled ? "" : "disabled"
-    }" data-domain="${domain}">
-      <div class="site-rule-info">
-        <div class="site-rule-domain">${domain}</div>
-        <div class="site-rule-details">
-          ${rule.inheritSubdomains ? "サブドメイン継承 | " : ""}
-          ${rule.enabled ? "有効" : "無効"}
+    if (elements.noRulesMessage) {
+      elements.noRulesMessage.classList.add("hidden");
+    }
+
+    const searchTerm = elements.siteRuleSearch
+      ? elements.siteRuleSearch.value.toLowerCase()
+      : "";
+    const filteredRules = ruleEntries.filter(([domain]) =>
+      domain.toLowerCase().includes(searchTerm)
+    );
+
+    elements.siteRulesList.innerHTML = filteredRules
+      .map(
+        ([domain, rule]) => `
+      <div class="site-rule-item ${
+        rule.enabled ? "" : "disabled"
+      }" data-domain="${domain}">
+        <div class="site-rule-info">
+          <div class="site-rule-domain">${domain}</div>
+          <div class="site-rule-details">
+            ${rule.inheritSubdomains ? "サブドメイン継承 | " : ""}
+            ${rule.enabled ? "有効" : "無効"}
+          </div>
+        </div>
+        <div class="site-rule-actions">
+          <button type="button" class="secondary-btn small-btn" data-action="toggle" data-domain="${domain}">
+            ${rule.enabled ? "無効化" : "有効化"}
+          </button>
+          <button type="button" class="secondary-btn small-btn" data-action="edit" data-domain="${domain}">
+            編集
+          </button>
+          <button type="button" class="danger-btn small-btn" data-action="delete" data-domain="${domain}">
+            削除
+          </button>
         </div>
       </div>
-      <div class="site-rule-actions">
-        <button type="button" class="secondary-btn small-btn" onclick="toggleSiteRule('${domain}')">
-          ${rule.enabled ? "無効化" : "有効化"}
-        </button>
-        <button type="button" class="secondary-btn small-btn" onclick="editSiteRule('${domain}')">
-          編集
-        </button>
-        <button type="button" class="danger-btn small-btn" onclick="confirmDeleteSiteRule('${domain}')">
-          削除
-        </button>
-      </div>
-    </div>
-  `
-    )
-    .join("");
+    `
+      )
+      .join("");
+  } catch (error) {
+    console.error("サイトルールUI更新エラー:", error);
+    elements.siteRulesList.innerHTML =
+      '<div class="error-message">サイトルールの読み込みに失敗しました</div>';
+  }
 }
 
 /**
@@ -761,8 +1284,74 @@ async function addCurrentSiteRule() {
  * サイトルールモーダルを開く
  */
 function openSiteRuleModal(domain = "", rule = null) {
+  console.log("ChronoClip: Opening site rule modal for domain:", domain);
+
+  // モーダル関連要素を動的に再取得
+  const modal = document.getElementById("siteRuleModal");
+  const form = document.getElementById("siteRuleForm");
+
+  if (!modal) {
+    console.error("ChronoClip: siteRuleModal not found in DOM");
+    showToast("モーダルウィンドウが見つかりません", "error");
+    return;
+  }
+
+  if (!form) {
+    console.error("ChronoClip: siteRuleForm not found in DOM");
+    showToast("サイトルール編集フォームが見つかりません", "error");
+    return;
+  }
+
+  // elements オブジェクトを更新
+  elements.siteRuleModal = modal;
+  elements.siteRuleForm = form;
+
+  // フォーム内の要素も再取得
+  const formElements = {
+    ruleDomain: document.getElementById("ruleDomain"),
+    ruleEnabled: document.getElementById("ruleEnabled"),
+    ruleInheritSubdomains: document.getElementById("ruleInheritSubdomains"),
+    ruleDateAnchor: document.getElementById("ruleDateAnchor"),
+    ruleDateBlock: document.getElementById("ruleDateBlock"),
+    ruleTitleSelector: document.getElementById("ruleTitleSelector"),
+    ruleTitleFallback: document.getElementById("ruleTitleFallback"),
+    ruleDescSelectors: document.getElementById("ruleDescSelectors"),
+    ruleMaxBlocks: document.getElementById("ruleMaxBlocks"),
+    ruleIncludeURL: document.getElementById("ruleIncludeURL"),
+    ruleLocationSelector: document.getElementById("ruleLocationSelector"),
+    ruleTimeStart: document.getElementById("ruleTimeStart"),
+    ruleTimeEnd: document.getElementById("ruleTimeEnd"),
+    rulePreferDateTime: document.getElementById("rulePreferDateTime"),
+    ruleRemoveSelectors: document.getElementById("ruleRemoveSelectors"),
+    ruleStopwords: document.getElementById("ruleStopwords"),
+    ruleCustomJoiner: document.getElementById("ruleCustomJoiner"),
+    ruleTrimBrackets: document.getElementById("ruleTrimBrackets"),
+    deleteSiteRuleBtn: document.getElementById("deleteSiteRuleBtn"),
+  };
+
+  // 欠けている要素をチェック
+  const missingElements = [];
+  for (const [key, element] of Object.entries(formElements)) {
+    if (!element) {
+      missingElements.push(key);
+    } else {
+      elements[key] = element;
+    }
+  }
+
+  if (missingElements.length > 0) {
+    console.warn("ChronoClip: Missing form elements:", missingElements);
+  }
+
+  console.log("ChronoClip: Modal elements re-acquired successfully");
+
   // フォームをリセット
-  elements.siteRuleForm.reset();
+  try {
+    console.log("ChronoClip: Resetting form:", elements.siteRuleForm);
+    elements.siteRuleForm.reset();
+  } catch (error) {
+    console.error("ChronoClip: Failed to reset form:", error);
+  }
 
   if (rule) {
     // 編集モード
@@ -866,96 +1455,157 @@ function closeSiteRuleModal() {
  * サイトルールを保存
  */
 async function saveSiteRule() {
-  const domain = elements.ruleDomain.value.trim();
+  console.log("ChronoClip: Starting saveSiteRule...");
 
-  if (!domain) {
-    showToast("ドメイン名を入力してください", "error");
-    return;
-  }
+  try {
+    const domain = elements.ruleDomain.value.trim();
 
-  // ドメイン名の簡易検証
-  if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
-    showToast("有効なドメイン名を入力してください", "error");
-    return;
-  }
-
-  const rule = {
-    enabled: elements.ruleEnabled.checked,
-    inheritSubdomains: elements.ruleInheritSubdomains.checked,
-    date: {
-      anchorSelector: elements.ruleDateAnchor.value.trim(),
-      withinBlockSelector: elements.ruleDateBlock.value.trim(),
-    },
-    title: {
-      fromSameBlockSelector: elements.ruleTitleSelector.value.trim(),
-      fallbackFromPrevHeading: elements.ruleTitleFallback.checked,
-    },
-    description: {
-      fromSameBlockSelectors: elements.ruleDescSelectors.value
-        .split("\n")
-        .map((s) => s.trim())
-        .filter((s) => s),
-      maxBlocks: parseInt(elements.ruleMaxBlocks.value) || 3,
-      includeURL: elements.ruleIncludeURL.value,
-    },
-    location: {
-      selector: elements.ruleLocationSelector.value.trim(),
-    },
-    time: {
-      startSelector: elements.ruleTimeStart.value.trim(),
-      endSelector: elements.ruleTimeEnd.value.trim(),
-      preferDateTimeAttr: elements.rulePreferDateTime.checked,
-    },
-    filters: {
-      removeSelectors: elements.ruleRemoveSelectors.value
-        .split("\n")
-        .map((s) => s.trim())
-        .filter((s) => s),
-      stopwords: elements.ruleStopwords.value
-        .split("\n")
-        .map((s) => s.trim())
-        .filter((s) => s),
-    },
-    advanced: {
-      customJoiner: elements.ruleCustomJoiner.value,
-      trimBrackets: elements.ruleTrimBrackets.checked,
-    },
-  };
-
-  // CSSセレクターの簡易検証
-  const selectorsToValidate = [
-    rule.date.anchorSelector,
-    rule.date.withinBlockSelector,
-    rule.title.fromSameBlockSelector,
-    ...rule.description.fromSameBlockSelectors,
-    rule.location.selector,
-    rule.time.startSelector,
-    rule.time.endSelector,
-    ...rule.filters.removeSelectors,
-  ].filter((s) => s);
-
-  for (const selector of selectorsToValidate) {
-    if (!isValidCSSSelector(selector)) {
-      showToast(`無効なCSSセレクターです: ${selector}`, "error");
+    if (!domain) {
+      showToast("ドメイン名を入力してください", "error");
       return;
     }
+
+    // ドメイン名の簡易検証
+    if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain) && domain !== "*") {
+      showToast("有効なドメイン名を入力してください", "error");
+      return;
+    }
+
+    console.log("ChronoClip: Saving rule for domain:", domain);
+
+    // ルールオブジェクトの構築
+    const rule = {
+      enabled: elements.ruleEnabled.checked,
+      inheritSubdomains: elements.ruleInheritSubdomains.checked,
+      date: {
+        anchorSelector: elements.ruleDateAnchor.value.trim(),
+        withinBlockSelector: elements.ruleDateBlock.value.trim(),
+      },
+      title: {
+        fromSameBlockSelector: elements.ruleTitleSelector.value.trim(),
+        fallbackFromPrevHeading: elements.ruleTitleFallback.checked,
+      },
+      description: {
+        fromSameBlockSelectors: elements.ruleDescSelectors.value
+          .split("\n")
+          .map((s) => s.trim())
+          .filter((s) => s),
+        maxBlocks: parseInt(elements.ruleMaxBlocks.value) || 3,
+        includeURL: elements.ruleIncludeURL.value,
+      },
+      location: {
+        selector: elements.ruleLocationSelector.value.trim(),
+      },
+      time: {
+        startSelector: elements.ruleTimeStart.value.trim(),
+        endSelector: elements.ruleTimeEnd.value.trim(),
+        preferDateTimeAttr: elements.rulePreferDateTime.checked,
+      },
+      filters: {
+        removeSelectors: elements.ruleRemoveSelectors.value
+          .split("\n")
+          .map((s) => s.trim())
+          .filter((s) => s),
+        stopwords: elements.ruleStopwords.value
+          .split("\n")
+          .map((s) => s.trim())
+          .filter((s) => s),
+      },
+      advanced: {
+        customJoiner: elements.ruleCustomJoiner.value,
+        trimBrackets: elements.ruleTrimBrackets.checked,
+      },
+    };
+
+    console.log("ChronoClip: Constructed rule:", rule);
+
+    // CSSセレクターの簡易検証
+    const selectorsToValidate = [
+      rule.date.anchorSelector,
+      rule.date.withinBlockSelector,
+      rule.title.fromSameBlockSelector,
+      ...rule.description.fromSameBlockSelectors,
+      rule.location.selector,
+      rule.time.startSelector,
+      rule.time.endSelector,
+      ...rule.filters.removeSelectors,
+    ].filter((s) => s);
+
+    for (const selector of selectorsToValidate) {
+      if (!isValidCSSSelector(selector)) {
+        showToast(`無効なCSSセレクターです: ${selector}`, "error");
+        return;
+      }
+    }
+
+    // 新しいモジュール化システムで保存（優先）
+    let savedWithNewSystem = false;
+    if (window.ChronoClipSiteRuleManager) {
+      try {
+        console.log("ChronoClip: Saving with new SiteRuleManager system...");
+        const siteRuleManager =
+          window.ChronoClipSiteRuleManager.getSiteRuleManager();
+        await siteRuleManager.initialize();
+
+        // 新システム用のルール形式
+        const newSystemRule = {
+          ...rule,
+          priority: 5, // UI追加ルールの優先度
+          titleSelector: rule.title.fromSameBlockSelector,
+          descriptionSelector: rule.description.fromSameBlockSelectors[0] || "",
+          dateSelector: rule.date.anchorSelector,
+          locationSelector: rule.location.selector,
+          ignoreSelector: rule.filters.removeSelectors[0] || "",
+          extractorModule: "general", // デフォルトエンジン
+        };
+
+        await siteRuleManager.addRule(domain, newSystemRule);
+        console.log("ChronoClip: Saved with new system successfully");
+        savedWithNewSystem = true;
+      } catch (error) {
+        console.error("ChronoClip: Failed to save with new system:", error);
+      }
+    }
+
+    // 従来システムでも保存（後方互換性・フォールバック）
+    try {
+      console.log("ChronoClip: Saving with legacy system...");
+      if (!currentSettings.siteRules) {
+        currentSettings.siteRules = {};
+      }
+      currentSettings.siteRules[domain] = rule;
+
+      // 設定を保存
+      await window.ChronoClipSettings.setSettings(currentSettings);
+      console.log("ChronoClip: Saved with legacy system successfully");
+    } catch (error) {
+      console.error("ChronoClip: Failed to save with legacy system:", error);
+      if (!savedWithNewSystem) {
+        throw error; // 両方失敗した場合はエラーを再発生
+      }
+    }
+
+    const systemMessage = savedWithNewSystem
+      ? "(新システム)" +
+        (currentSettings.siteRules[domain] ? " & 従来システム" : "")
+      : "(従来システムのみ)";
+
+    showToast(
+      `サイトルール "${domain}" を保存しました ${systemMessage}`,
+      "success"
+    );
+
+    // UI更新
+    updateSiteRulesUI();
+    closeSiteRuleModal();
+
+    // 変更フラグ設定
+    isDirty = true;
+    updateSaveButtonState();
+  } catch (error) {
+    console.error("ChronoClip: saveSiteRule failed:", error);
+    showToast("サイトルールの保存に失敗しました: " + error.message, "error");
   }
-
-  // 設定に追加
-  if (!currentSettings.siteRules) {
-    currentSettings.siteRules = {};
-  }
-  currentSettings.siteRules[domain] = rule;
-
-  // UI更新
-  updateSiteRulesUI();
-  closeSiteRuleModal();
-
-  // 変更フラグ設定
-  isDirty = true;
-  updateSaveButtonState();
-
-  showToast(`サイトルール "${domain}" を保存しました`, "success");
 }
 
 /**
@@ -973,26 +1623,70 @@ function isValidCSSSelector(selector) {
 /**
  * サイトルールの有効/無効切り替え
  */
-function toggleSiteRule(domain) {
-  if (currentSettings.siteRules && currentSettings.siteRules[domain]) {
-    currentSettings.siteRules[domain].enabled =
-      !currentSettings.siteRules[domain].enabled;
-    updateSiteRulesUI();
-    isDirty = true;
-    updateSaveButtonState();
+async function toggleSiteRule(domain) {
+  try {
+    if (currentSettings.siteRules && currentSettings.siteRules[domain]) {
+      const newStatus = !currentSettings.siteRules[domain].enabled;
+      currentSettings.siteRules[domain].enabled = newStatus;
 
-    const status = currentSettings.siteRules[domain].enabled ? "有効" : "無効";
-    showToast(`サイトルール "${domain}" を${status}にしました`, "success");
+      // 新しいモジュール化システムでも更新
+      if (window.ChronoClipSiteRuleManager) {
+        const siteRuleManager =
+          window.ChronoClipSiteRuleManager.getSiteRuleManager();
+        await siteRuleManager.initialize();
+
+        const rule = await siteRuleManager.getRuleForDomain(domain);
+        if (rule) {
+          rule.enabled = newStatus;
+          await siteRuleManager.addRule(domain, rule);
+        }
+      }
+
+      updateSiteRulesUI();
+      isDirty = true;
+      updateSaveButtonState();
+
+      const status = newStatus ? "有効" : "無効";
+      showToast(`サイトルール "${domain}" を${status}にしました`, "success");
+    }
+  } catch (error) {
+    console.error("サイトルール有効/無効切り替えエラー:", error);
+    showToast("サイトルールの切り替えに失敗しました", "error");
   }
 }
 
 /**
  * サイトルール編集
  */
-function editSiteRule(domain) {
-  const rule = currentSettings.siteRules[domain];
-  if (rule) {
-    openSiteRuleModal(domain, rule);
+async function editSiteRule(domain) {
+  try {
+    let rule = null;
+
+    // 新しいモジュール化システムからルールを取得
+    if (window.ChronoClipSiteRuleManager) {
+      const siteRuleManager =
+        window.ChronoClipSiteRuleManager.getSiteRuleManager();
+      await siteRuleManager.initialize();
+      rule = await siteRuleManager.getRuleForDomain(domain);
+    }
+
+    // フォールバック: 従来設定からルールを取得
+    if (
+      !rule &&
+      currentSettings.siteRules &&
+      currentSettings.siteRules[domain]
+    ) {
+      rule = currentSettings.siteRules[domain];
+    }
+
+    if (rule) {
+      openSiteRuleModal(domain, rule);
+    } else {
+      showToast(`サイトルール "${domain}" が見つかりません`, "error");
+    }
+  } catch (error) {
+    console.error("サイトルール編集エラー:", error);
+    showToast("サイトルールの取得に失敗しました", "error");
   }
 }
 
@@ -1010,13 +1704,28 @@ function confirmDeleteSiteRule(domain) {
 /**
  * サイトルール削除実行
  */
-function deleteSiteRuleConfirmed(domain) {
-  if (currentSettings.siteRules && currentSettings.siteRules[domain]) {
-    delete currentSettings.siteRules[domain];
+async function deleteSiteRuleConfirmed(domain) {
+  try {
+    // 新しいモジュール化システムで削除
+    if (window.ChronoClipSiteRuleManager) {
+      const siteRuleManager =
+        window.ChronoClipSiteRuleManager.getSiteRuleManager();
+      await siteRuleManager.initialize();
+      await siteRuleManager.removeRule(domain);
+    }
+
+    // 従来の設定からも削除
+    if (currentSettings.siteRules && currentSettings.siteRules[domain]) {
+      delete currentSettings.siteRules[domain];
+    }
+
     updateSiteRulesUI();
     isDirty = true;
     updateSaveButtonState();
     showToast(`サイトルール "${domain}" を削除しました`, "success");
+  } catch (error) {
+    console.error("サイトルール削除エラー:", error);
+    showToast("サイトルールの削除に失敗しました", "error");
   }
 }
 
@@ -1146,5 +1855,13 @@ window.openTestPage = openTestPage;
 window.toggleSiteRule = toggleSiteRule;
 window.editSiteRule = editSiteRule;
 window.confirmDeleteSiteRule = confirmDeleteSiteRule;
+window.addCurrentSiteRule = addCurrentSiteRule;
+window.filterSiteRules = filterSiteRules;
+window.openSiteRuleModal = openSiteRuleModal;
+window.closeSiteRuleModal = closeSiteRuleModal;
+window.saveSiteRule = saveSiteRule;
+window.exportSiteRules = exportSiteRules;
+window.importSiteRules = importSiteRules;
+window.toggleCollapsibleSection = toggleCollapsibleSection;
 
 console.log("ChronoClip: Options script loaded");

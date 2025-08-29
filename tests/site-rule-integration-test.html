@@ -96,8 +96,39 @@
       <div id="extractor-result" class="test-result"></div>
     </div>
 
+    <div class="test-section">
+      <h2>5. 新しいモジュールシステムテスト</h2>
+      <button onclick="testNewModuleSystem()">
+        新モジュールシステムテスト
+      </button>
+      <div id="module-system-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>6. 新旧システム同期テスト</h2>
+      <button onclick="testSystemSync()">システム同期テスト</button>
+      <div id="sync-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>7. 総合テスト実行</h2>
+      <button
+        onclick="runAllTests()"
+        style="background-color: #007bff; color: white; font-weight: bold"
+      >
+        すべてのテストを実行
+      </button>
+      <div id="all-tests-result" class="test-result"></div>
+    </div>
+
     <!-- 必要なライブラリの読み込み -->
     <script src="../lib/settings.js"></script>
+    <script src="../lib/site-rule-manager.js"></script>
+    <script src="../lib/extractors/base-extractor.js"></script>
+    <script src="../lib/extractors/eventbrite-extractor.js"></script>
+    <script src="../lib/extractors/amazon-extractor.js"></script>
+    <script src="../lib/extractors/general-extractor.js"></script>
+    <script src="../lib/extractors/extractor-factory.js"></script>
     <script src="../content/extractor.js"></script>
 
     <script>
@@ -468,6 +499,164 @@
         }
       }
 
+      // 新しいモジュールシステムのテスト
+      async function testNewModuleSystem() {
+        try {
+          console.log("Testing new module system...");
+
+          // SiteRuleManagerのテスト
+          if (!window.ChronoClipSiteRuleManager) {
+            throw new Error("SiteRuleManager not available");
+          }
+
+          const siteRuleManager =
+            window.ChronoClipSiteRuleManager.getSiteRuleManager();
+          await siteRuleManager.initialize();
+
+          // テストルールの追加
+          const testRule = {
+            enabled: true,
+            inheritSubdomains: true,
+            priority: 5,
+            titleSelector: ".new-system-title",
+            descriptionSelector: ".new-system-desc",
+            dateSelector: ".new-system-date",
+            extractorModule: "general",
+          };
+
+          await siteRuleManager.addRule("new-system-test.com", testRule);
+
+          // ルールが正しく追加されたかテスト
+          const retrievedRule = siteRuleManager.getRuleForDomain(
+            "new-system-test.com"
+          );
+          if (
+            !retrievedRule ||
+            retrievedRule.titleSelector !== ".new-system-title"
+          ) {
+            throw new Error("SiteRuleManager rule addition/retrieval failed");
+          }
+
+          // ExtractorFactoryのテスト
+          if (!window.ChronoClipExtractorFactory) {
+            throw new Error("ExtractorFactory not available");
+          }
+
+          const extractorFactory =
+            window.ChronoClipExtractorFactory.getExtractorFactory();
+          extractorFactory.initialize();
+
+          const availableExtractors = extractorFactory.getAvailableExtractors();
+          if (
+            !availableExtractors.includes("general") ||
+            !availableExtractors.includes("eventbrite")
+          ) {
+            throw new Error("ExtractorFactory missing expected extractors");
+          }
+
+          logResult(
+            "New Module System",
+            true,
+            "新しいモジュールシステムテスト成功"
+          );
+          displayResult(
+            "module-system-result",
+            true,
+            `新モジュールシステム成功: SiteRuleManager & ExtractorFactory 正常動作確認。利用可能エンジン: ${availableExtractors.join(
+              ", "
+            )}`
+          );
+        } catch (error) {
+          logResult("New Module System", false, error.message);
+          displayResult(
+            "module-system-result",
+            false,
+            `新モジュールシステムエラー: ${error.message}`
+          );
+        }
+      }
+
+      // 新旧システム間の同期テスト
+      async function testSystemSync() {
+        try {
+          console.log("Testing old/new system synchronization...");
+
+          const testDomain = "sync-test.example.com";
+          const testRule = {
+            enabled: true,
+            inheritSubdomains: false,
+            date: {
+              anchorSelector: ".sync-date",
+              withinBlockSelector: ".sync-block",
+            },
+            title: {
+              fromSameBlockSelector: ".sync-title",
+              fallbackFromPrevHeading: true,
+            },
+            description: {
+              fromSameBlockSelectors: [".sync-desc"],
+              maxBlocks: 3,
+              includeURL: "inherit",
+            },
+          };
+
+          // 従来システムでルール保存
+          const settings = await window.ChronoClipSettings.getSettings();
+          if (!settings.siteRules) {
+            settings.siteRules = {};
+          }
+          settings.siteRules[testDomain] = testRule;
+          await window.ChronoClipSettings.setSettings(settings);
+
+          // 新システムでも同じルールを追加
+          if (window.ChronoClipSiteRuleManager) {
+            const siteRuleManager =
+              window.ChronoClipSiteRuleManager.getSiteRuleManager();
+            await siteRuleManager.initialize();
+
+            const newSystemRule = {
+              ...testRule,
+              priority: 5,
+              titleSelector: testRule.title.fromSameBlockSelector,
+              descriptionSelector:
+                testRule.description.fromSameBlockSelectors[0],
+              dateSelector: testRule.date.anchorSelector,
+              extractorModule: "general",
+            };
+
+            await siteRuleManager.addRule(testDomain, newSystemRule);
+
+            // 両システムからルールを取得して比較
+            const oldSystemRule = settings.siteRules[testDomain];
+            const newSystemRule2 = siteRuleManager.getRuleForDomain(testDomain);
+
+            if (
+              oldSystemRule &&
+              newSystemRule2 &&
+              oldSystemRule.enabled === newSystemRule2.enabled
+            ) {
+              logResult("System Sync", true, "新旧システム同期成功");
+              displayResult(
+                "sync-result",
+                true,
+                `システム同期成功: 新旧両システムでルール "${testDomain}" が正常に保存・取得されました`
+              );
+            } else {
+              throw new Error("新旧システム間の同期に問題があります");
+            }
+          } else {
+            throw new Error("新システム（SiteRuleManager）が利用できません");
+          }
+        } catch (error) {
+          logResult("System Sync", false, error.message);
+          displayResult(
+            "sync-result",
+            false,
+            `システム同期エラー: ${error.message}`
+          );
+        }
+      }
+
       // ページ読み込み完了時にテスト実行可能状態を確認
       window.addEventListener("DOMContentLoaded", function () {
         const infoDiv = document.createElement("div");
@@ -483,30 +672,62 @@
           "ChronoClip Site Rule Integration Test - Starting all tests..."
         );
 
-        await testSettings();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // テスト結果をリセット
+        testResults = [];
 
-        await testEffectiveSettings();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        try {
+          await testSettings();
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
-        await testSiteRuleValidation();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+          await testEffectiveSettings();
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
-        await addTestSiteRule();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+          await testSiteRuleValidation();
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
-        await testSiteRuleExtraction();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+          await addTestSiteRule();
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
-        await testIgnoreSelector();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+          await testSiteRuleExtraction();
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
-        await testSubdomainInheritance();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+          await testIgnoreSelector();
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
-        await testExtractorIntegration();
+          await testSubdomainInheritance();
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
-        console.log("All tests completed. Results:", testResults);
+          await testExtractorIntegration();
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          // 新しいテストを追加
+          await testNewModuleSystem();
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          await testSystemSync();
+
+          console.log("All tests completed. Results:", testResults);
+
+          // 総合結果表示
+          const successCount = testResults.filter((r) => r.success).length;
+          const totalCount = testResults.length;
+          const isAllSuccess = successCount === totalCount;
+
+          displayResult(
+            "all-tests-result",
+            isAllSuccess,
+            `総合テスト結果: ${successCount}/${totalCount} 成功 ${
+              isAllSuccess ? "✅ 全テスト合格!" : "❌ 一部テスト失敗"
+            }`
+          );
+        } catch (error) {
+          console.error("runAllTests failed:", error);
+          displayResult(
+            "all-tests-result",
+            false,
+            `総合テストエラー: ${error.message}`
+          );
+        }
       }
 
       // 自動テスト実行（3秒後）

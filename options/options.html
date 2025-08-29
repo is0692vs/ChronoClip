@@ -537,7 +537,7 @@
     <footer>
       <p>ChronoClip v1.0 - ウェブページの日付をGoogleカレンダーに簡単追加</p>
       <div class="test-button-container">
-        <button type="button" onclick="openTestPage()" class="test-button">
+        <button type="button" id="openTestPageBtn" class="test-button">
           📊 設定システムのテストページを開く
         </button>
       </div>
@@ -545,6 +545,12 @@
 
     <!-- スクリプト読み込み -->
     <script src="../lib/settings.js"></script>
+    <script src="../lib/site-rule-manager.js"></script>
+    <script src="../lib/extractors/base-extractor.js"></script>
+    <script src="../lib/extractors/eventbrite-extractor.js"></script>
+    <script src="../lib/extractors/amazon-extractor.js"></script>
+    <script src="../lib/extractors/general-extractor.js"></script>
+    <script src="../lib/extractors/extractor-factory.js"></script>
     <script src="options.js"></script>
   </body>
 </html>
