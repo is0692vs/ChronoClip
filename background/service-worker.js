@@ -92,6 +92,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "calendar:createEvent":
       console.log("ChronoClip: Received calendar:createEvent", message.payload);
+
+      // ペイロードの検証
+      if (!message.payload) {
+        console.error("ChronoClip: No payload provided");
+        sendResponse({
+          ok: false,
+          code: 400,
+          message: "ペイロードが提供されていません",
+        });
+        break;
+      }
+
+      if (!message.payload.summary) {
+        console.error("ChronoClip: No summary provided", message.payload);
+        sendResponse({
+          ok: false,
+          code: 400,
+          message: "イベントタイトルが必要です",
+        });
+        break;
+      }
+
+      if (!message.payload.start) {
+        console.error("ChronoClip: No start time provided", message.payload);
+        sendResponse({ ok: false, code: 400, message: "開始時刻が必要です" });
+        break;
+      }
+
+      if (!message.payload.end) {
+        console.error("ChronoClip: No end time provided", message.payload);
+        sendResponse({ ok: false, code: 400, message: "終了時刻が必要です" });
+        break;
+      }
+
       createEvent(message.payload)
         .then((event) => {
           showNotification(

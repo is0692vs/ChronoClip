@@ -52,6 +52,13 @@ ChronoClip は、ウェブサイト上の日付情報を自動的に検出し、
 - バリデーション機能でセレクターの正確性を保証
 - 即時反映で設定変更がリアルタイムに適用
 
+### 7. カスタム抽出器開発機能 ✨ **NEW!**
+
+- JavaScript で独自のサイト専用抽出器を作成可能
+- 後楽園ホール専用抽出器やサンプル抽出器を参考に開発
+- タイトル・URL・日時・All Day 判定・詳細情報を自由に定義
+- モジュール化されたアーキテクチャで簡単統合
+
 ### 7. 高度な日付解析
 
 - chrono-node ライブラリによる自然言語日付解析
@@ -141,12 +148,128 @@ ChronoClip は、ウェブサイト上の日付情報を自動的に検出し、
 
 ```text
 ChronoClip/
-├── manifest.json                 # 拡張機能設定
-├── config/
-│   ├── constants.js             # 設定定数
-│   └── site-patterns.js         # サイト固有検出パターン
+├── manifest.json                     # 拡張機能設定
+├── manifest.example.json            # 設定例（機密情報除外版）
 ├── background/
-│   └── service-worker.js        # バックグラウンド処理`
+│   └── service-worker.js            # バックグラウンド処理
+├── content/
+│   ├── content-script.js            # メインコンテンツスクリプト
+│   ├── content.css                  # コンテンツスタイル
+│   └── extractor.js                 # イベント情報抽出ロジック
+├── lib/
+│   ├── chrono.min.js               # 日付解析ライブラリ
+│   ├── date-utils.js               # 日付ユーティリティ
+│   ├── regex-patterns.js           # 正規表現パターン
+│   ├── calendar.js                 # カレンダー処理
+│   ├── settings.js                 # 設定管理
+│   ├── site-rule-manager.js        # サイトルール管理
+│   └── extractors/                 # カスタム抽出器
+│       ├── base-extractor.js       # 基底抽出器クラス
+│       ├── general-extractor.js    # 汎用抽出器
+│       ├── tokyo-dome-hall-extractor.js  # 後楽園ホール専用抽出器
+│       ├── example-extractor.js    # サンプル抽出器（開発用）
+│       └── extractor-factory.js    # 抽出器ファクトリー
+├── options/
+│   ├── options.html                # 設定画面
+│   └── options.js                  # 設定画面ロジック
+├── popup/
+│   ├── popup.html                  # ポップアップUI
+│   ├── popup.js                    # ポップアップロジック
+│   └── popup.css                   # ポップアップスタイル
+├── quick-add-popup.html            # クイック追加ポップアップUI
+├── quick-add-popup.css             # クイック追加ポップアップスタイル
+├── icons/                          # アイコンファイル
+└── tests/                          # テストファイル
+    ├── date-detection.test.js      # 日付検出テスト
+        └── *.html                      # テスト用HTMLファイル
+```
+
+## 🎯 カスタム抽出器の開発
+
+ChronoClip では、特定のサイト向けに専用の抽出器を作成できます。
+
+### 抽出器の作成手順
+
+1. **ベースファイルの作成**
+
+   `lib/extractors/example-extractor.js` をコピーして、新しい抽出器ファイルを作成します。
+
+2. **基本設定の変更**
+
+```javascript
+constructor() {
+  this.domain = "yoursite.com";      // 対象ドメイン
+  this.name = "YourSiteExtractor";   // 抽出器名
+  this.version = "1.0.0";           // バージョン
+
+  // CSS セレクター定義
+  this.selectors = {
+    titleElement: ".event-title",    // タイトル要素
+    linkElement: ".event-title a",   // URL取得用リンク要素
+    dateElement: ".event-date",      // 日付要素
+    timeElement: ".event-time",      // 時間要素
+    // 必要に応じて追加
+  };
+}
+```
+
+3. **抽出ロジックの実装**
+
+```javascript
+async extract(context) {
+  try {
+    // タイトル抽出
+    const title = this.extractTitle(context);
+
+    // URL抽出（タイトルと同じ行のhref属性から）
+    const url = this.extractUrl(context);
+
+    // 日付・時間抽出
+    const dateTime = this.extractDateTime(context);
+
+    // All Day判定
+    const isAllDay = this.extractAllDay(context);
+
+    // 結果を返す
+    return {
+      title: title,
+      description: url || "",  // 詳細にはURLを設定
+      date: dateTime,
+      url: url,
+      confidence: 0.9,
+      extractor: this.name,
+      domain: this.domain,
+    };
+  } catch (error) {
+    // エラーハンドリング
+    return { /* エラー時の戻り値 */ };
+  }
+}
+```
+
+4. **抽出器の登録**
+
+   `lib/extractors/extractor-factory.js` に新しい抽出器を登録します。
+
+5. **manifest.json の更新**
+
+   新しい抽出器ファイルをスクリプトリストに追加します。
+
+### 抽出できる情報
+
+- **タイトル**: イベント名
+- **URL**: イベント詳細ページのURL（詳細フィールドに表示）
+- **日付・時間**: イベントの開始日時
+- **All Day**: 終日イベントかどうか
+- **場所**: イベント開催場所
+- **価格**: 料金情報
+
+### 参考実装
+
+後楽園ホール専用抽出器（`tokyo-dome-hall-extractor.js`）が完全な実装例として利用できます。
+
+## 🔧 対応する日付形式
+````
 
 ## 🔜 開発ロードマップ
 
@@ -246,21 +369,21 @@ ChronoClip では、`config/constants.js` ファイルで各種定数と設定�
 
 ```javascript
 // カスタムパターンの追加例
-window.addCustomSitePattern('my-custom-site', {
-  domains: ['example.com', 'subdomain.example.com'],
+window.addCustomSitePattern("my-custom-site", {
+  domains: ["example.com", "subdomain.example.com"],
   selectors: {
-    title: ['.event-title', 'h1.title'],
-    date: ['.event-date', '.schedule'],
-    description: ['.event-description', '.content'],
-    price: ['.price', '.cost']
+    title: [".event-title", "h1.title"],
+    date: [".event-date", ".schedule"],
+    description: [".event-description", ".content"],
+    price: [".price", ".cost"],
   },
-  dateFormats: ['YYYY年MM月DD日', 'MM月DD日'],
-  priority: 15,  // 優先度（高いほど先に適用）
+  dateFormats: ["YYYY年MM月DD日", "MM月DD日"],
+  priority: 15, // 優先度（高いほど先に適用）
   extraction: {
-    dateStrategy: 'site-specific',
-    titleStrategy: 'site-specific',
-    descriptionStrategy: 'general'
-  }
+    dateStrategy: "site-specific",
+    titleStrategy: "site-specific",
+    descriptionStrategy: "general",
+  },
 });
 ```
 
@@ -268,12 +391,12 @@ window.addCustomSitePattern('my-custom-site', {
 
 ```javascript
 // 既存パターンの部分更新
-window.updateSitePattern('eventbrite', {
+window.updateSitePattern("eventbrite", {
   selectors: {
-    title: ['.event-title', '.custom-title'],  // セレクターを追加
+    title: [".event-title", ".custom-title"], // セレクターを追加
     // 他の設定は既存のまま保持
   },
-  priority: 20  // 優先度のみ変更
+  priority: 20, // 優先度のみ変更
 });
 ```
 
@@ -283,7 +406,7 @@ window.updateSitePattern('eventbrite', {
 
 ```javascript
 // カスタム抽出戦略の追加例
-window.ChronoClipExtractor.addCustomStrategy('my-strategy', {
+window.ChronoClipExtractor.addCustomStrategy("my-strategy", {
   extractDate: async (context) => {
     // 独自の日付抽出ロジック
     return dateInfo;
@@ -296,9 +419,10 @@ window.ChronoClipExtractor.addCustomStrategy('my-strategy', {
     // 独自の詳細抽出ロジック
     return description;
   },
-  priority: 12  // 既存戦略との優先度調整
+  priority: 12, // 既存戦略との優先度調整
 });
 ```
+
 - `BATCH_SIZE`: バッチ処理のサイズ（デフォルト: 100）
 - `MAX_NODES`: 処理対象の最大ノード数（デフォルト: 1000）
 
@@ -323,4 +447,7 @@ EVENT: {
   // その他の設定...
 }
 ```
-````
+
+```
+
+```

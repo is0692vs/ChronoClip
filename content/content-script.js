@@ -921,6 +921,7 @@ const ignoreSelectors = [
             return;
           }
 
+          console.log("ChronoClip: Sending event to background:", eventPayload);
           chrome.runtime.sendMessage(
             {
               type: "calendar:createEvent",
@@ -936,6 +937,8 @@ const ignoreSelectors = [
                 return;
               }
 
+              console.log("ChronoClip: Received response:", response);
+
               if (response && response.ok) {
                 showToast(
                   "success",
@@ -945,6 +948,7 @@ const ignoreSelectors = [
                 const errorMessage =
                   response?.message ||
                   "不明なエラーで予定の追加に失敗しました。";
+                console.error("ChronoClip: Calendar API error:", errorMessage);
                 showToast("error", `エラー: ${errorMessage}`);
               }
             }
@@ -1919,6 +1923,17 @@ async function showQuickAddPopupForExtractedData(
             return;
           }
 
+          // デバッグ: フォーム値の確認
+          console.log("ChronoClip: Form values:", {
+            title,
+            description,
+            date,
+            isAllDay,
+            startTime,
+            endTime,
+            eventDataUrl: eventData?.url,
+          });
+
           let eventPayload;
 
           if (isAllDay) {
@@ -1997,17 +2012,20 @@ async function showQuickAddPopupForExtractedData(
                 );
                 return;
               }
-              if (response && response.success) {
+
+              console.log("ChronoClip: Received response:", response);
+
+              if (response && response.ok) {
                 showToast(
                   "success",
                   `イベント「${eventPayload.summary}」をカレンダーに追加しました。`
                 );
               } else {
+                const errorMessage = response?.message || "不明なエラー";
+                console.error("ChronoClip: Calendar API error:", errorMessage);
                 showToast(
                   "error",
-                  `イベントの追加に失敗しました: ${
-                    response ? response.error : "不明なエラー"
-                  }`
+                  `イベントの追加に失敗しました: ${errorMessage}`
                 );
               }
             }
