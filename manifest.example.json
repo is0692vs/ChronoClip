@@ -20,7 +20,7 @@
     ]
   },
   "background": {
-    "service_worker": "background/service-worker.js"
+    "service_worker": "src/background/service-worker.js"
   },
   "content_scripts": [
     {
@@ -28,54 +28,54 @@
       "js": [
         "config/constants.js",
         "config/site-patterns.js",
-        "lib/settings.js",
-        "lib/site-rule-manager.js",
-        "lib/extractors/base-extractor.js",
-        "lib/extractors/eventbrite-extractor.js",
-        "lib/extractors/amazon-extractor.js",
-        "lib/extractors/tokyo-dome-hall-extractor.js",
-        "lib/extractors/stardom-detail-extractor.js",
-        "lib/extractors/stardom-month-extractor.js",
-        "lib/extractors/general-extractor.js",
-        "lib/extractors/extractor-factory.js",
-        "lib/regex-patterns.js",
-        "lib/date-utils.js",
-        "lib/date-parser.js",
-        "lib/chrono.min.js",
-        "content/event-detector.js",
-        "content/extractor-api.js",
-        "content/extractor.js",
-        "content/selection.js",
-        "content/content-script.js"
+        "src/shared/settings.js",
+        "src/shared/site-rule-manager.js",
+        "src/shared/extractors/base-extractor.js",
+        "src/shared/extractors/eventbrite-extractor.js",
+        "src/shared/extractors/amazon-extractor.js",
+        "src/shared/extractors/tokyo-dome-hall-extractor.js",
+        "src/shared/extractors/stardom-detail-extractor.js",
+        "src/shared/extractors/stardom-month-extractor.js",
+        "src/shared/extractors/general-extractor.js",
+        "src/shared/extractors/extractor-factory.js",
+        "src/shared/regex-patterns.js",
+        "src/shared/date-utils.js",
+        "src/shared/date-parser.js",
+        "src/shared/chrono.min.js",
+        "src/content/event-detector.js",
+        "src/content/extractor-api.js",
+        "src/content/extractor.js",
+        "src/content/selection.js",
+        "src/content/content-script.js"
       ],
-      "css": ["content/content.css"]
+      "css": ["src/content/content.css"]
     }
   ],
   "web_accessible_resources": [
     {
       "resources": [
-        "quick-add-popup.html",
-        "quick-add-popup.css",
+        "src/ui/quick-add-popup.html",
+        "src/ui/quick-add-popup.css",
         "tests/settings-integration-test.html"
       ],
       "matches": ["<all_urls>"]
     }
   ],
   "action": {
-    "default_popup": "popup/popup.html",
+    "default_popup": "src/ui/popup/popup.html",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "src/assets/icon16.png",
+      "48": "src/assets/icon48.png",
+      "128": "src/assets/icon128.png"
     }
   },
   "options_ui": {
-    "page": "options/options.html",
+    "page": "src/ui/options/options.html",
     "open_in_tab": true
   },
   "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "src/assets/icon16.png",
+    "48": "src/assets/icon48.png",
+    "128": "src/assets/icon128.png"
   }
 }

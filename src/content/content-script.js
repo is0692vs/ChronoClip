@@ -691,8 +691,8 @@ const ignoreSelectors = [
       }
 
       // HTMLとCSSをフェッチ
-      const htmlUrl = chrome.runtime.getURL("quick-add-popup.html");
-      const cssUrl = chrome.runtime.getURL("quick-add-popup.css");
+      const htmlUrl = chrome.runtime.getURL("src/ui/quick-add-popup.html");
+      const cssUrl = chrome.runtime.getURL("src/ui/quick-add-popup.css");
 
       const [htmlResponse, cssResponse] = await Promise.all([
         fetch(htmlUrl),
@@ -1659,8 +1659,8 @@ async function showQuickAddPopupForExtractedData(
     }
 
     // HTMLとCSSをフェッチ
-    const htmlUrl = chrome.runtime.getURL("quick-add-popup.html");
-    const cssUrl = chrome.runtime.getURL("quick-add-popup.css");
+    const htmlUrl = chrome.runtime.getURL("src/ui/quick-add-popup.html");
+    const cssUrl = chrome.runtime.getURL("src/ui/quick-add-popup.css");
 
     const [htmlResponse, cssResponse] = await Promise.all([
       fetch(htmlUrl),

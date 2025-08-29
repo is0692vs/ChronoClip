@@ -1,4 +1,4 @@
-importScripts("../lib/calendar.js");
+importScripts("../shared/calendar.js");
 // background/service-worker.js
 
 console.log("ChronoClip Service Worker loaded.");
