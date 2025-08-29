@@ -35,6 +35,7 @@
         "lib/extractors/amazon-extractor.js",
         "lib/extractors/tokyo-dome-hall-extractor.js",
         "lib/extractors/stardom-detail-extractor.js",
+        "lib/extractors/stardom-month-extractor.js",
         "lib/extractors/general-extractor.js",
         "lib/extractors/extractor-factory.js",
         "lib/regex-patterns.js",

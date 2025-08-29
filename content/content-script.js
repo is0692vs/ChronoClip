@@ -571,33 +571,48 @@ const ignoreSelectors = [
     let shouldShowDefaultPopup = true; // デフォルトポップアップを表示するかのフラグ
 
     try {
-      if (window.ChronoClipExtractor && e.target) {
-        // オプション設定を取得
-        const options = {
-          includeURL: true,
-          maxChars: 200, // 処理を軽くするため短縮
-          headingSearchDepth: 2, // 探索深度も制限
-        };
+      if (e.target) {
+        // 新しい抽出エンジンファクトリーを使用
+        if (window.ChronoClipExtractorFactory) {
+          const extractorFactory =
+            window.ChronoClipExtractorFactory.getExtractorFactory();
+          const domain = window.location.hostname;
 
-        // ストレージからオプションを非同期で取得（軽量化）
-        try {
-          // Extension context が有効かチェック
-          if (chrome.runtime?.id) {
-            const result = await new Promise((resolve) => {
-              chrome.storage.sync.get(["includeURL"], resolve);
-            });
-            if (result.includeURL !== undefined) {
-              options.includeURL = result.includeURL;
+          console.log("ChronoClip: Using ExtractorFactory for domain:", domain);
+
+          // ExtractorFactoryで抽出を実行
+          extractedEvent = extractorFactory.extract(e.target, domain);
+        } else if (window.ChronoClipExtractor) {
+          // フォールバック: 古い抽出エンジンを使用
+          console.log("ChronoClip: Falling back to legacy extractor");
+
+          // オプション設定を取得
+          const options = {
+            includeURL: true,
+            maxChars: 200, // 処理を軽くするため短縮
+            headingSearchDepth: 2, // 探索深度も制限
+          };
+
+          // ストレージからオプションを非同期で取得（軽量化）
+          try {
+            // Extension context が有効かチェック
+            if (chrome.runtime?.id) {
+              const result = await new Promise((resolve) => {
+                chrome.storage.sync.get(["includeURL"], resolve);
+              });
+              if (result.includeURL !== undefined) {
+                options.includeURL = result.includeURL;
+              }
             }
+          } catch (error) {
+            console.warn("ChronoClip: Failed to load options, using defaults");
           }
-        } catch (error) {
-          console.warn("ChronoClip: Failed to load options, using defaults");
-        }
 
-        extractedEvent = window.ChronoClipExtractor.extractEventContext(
-          e.target,
-          options
-        );
+          extractedEvent = window.ChronoClipExtractor.extractEventContext(
+            e.target,
+            options
+          );
+        }
         performanceMonitor.extractionCalls++;
         console.log("ChronoClip: Extracted event context:", extractedEvent);
 
