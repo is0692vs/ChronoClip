@@ -1,12 +1,192 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>ChronoClip Settings</title>
-  <meta charset="UTF-8">
-</head>
-<body>
-  <h1>ChronoClip 設定</h1>
-  <p>設定項目はまだありません。</p>
-  <script src="options.js"></script>
-</body>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChronoClip 設定</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <header>
+      <h1>🗓️ ChronoClip 設定</h1>
+      <p>ウェブ上の日付をGoogleカレンダーに追加する際の動作を設定できます</p>
+    </header>
+
+    <main>
+      <form id="settingsForm">
+        <!-- 基本設定 -->
+        <section class="setting-section">
+          <h2>基本設定</h2>
+
+          <div class="setting-item">
+            <label for="autoDetect">
+              <input type="checkbox" id="autoDetect" name="autoDetect" />
+              自動検出を有効にする
+            </label>
+            <p class="description">
+              ページを開いた時に日付を自動でスキャンします
+            </p>
+          </div>
+
+          <div class="setting-item">
+            <label for="highlightDates">
+              <input
+                type="checkbox"
+                id="highlightDates"
+                name="highlightDates"
+              />
+              日付をハイライト表示する
+            </label>
+            <p class="description">
+              検出した日付にマウスオーバーで色を付けて表示します
+            </p>
+          </div>
+
+          <div class="setting-item">
+            <label for="includeURL">
+              <input type="checkbox" id="includeURL" name="includeURL" />
+              イベントにページURLを含める
+            </label>
+            <p class="description">
+              カレンダーイベントの説明にページのURLを自動追加します
+            </p>
+          </div>
+        </section>
+
+        <!-- イベント設定 -->
+        <section class="setting-section">
+          <h2>イベント設定</h2>
+
+          <div class="setting-item">
+            <label for="defaultDuration">デフォルト時間（分）</label>
+            <input
+              type="number"
+              id="defaultDuration"
+              name="defaultDuration"
+              min="15"
+              max="1440"
+              step="15"
+              class="number-input"
+            />
+            <p class="description">
+              時刻が指定されていない場合のイベント継続時間
+            </p>
+          </div>
+
+          <div class="setting-item">
+            <label for="defaultCalendar">追加先カレンダー</label>
+            <select
+              id="defaultCalendar"
+              name="defaultCalendar"
+              class="select-input"
+            >
+              <option value="primary">プライマリカレンダー</option>
+            </select>
+            <p class="description">イベントを追加するGoogleカレンダーを選択</p>
+          </div>
+
+          <div class="setting-item">
+            <label for="timezone">タイムゾーン</label>
+            <select id="timezone" name="timezone" class="select-input">
+              <option value="Asia/Tokyo">日本標準時 (JST)</option>
+              <option value="UTC">協定世界時 (UTC)</option>
+              <option value="America/New_York">東部標準時 (EST)</option>
+              <option value="America/Los_Angeles">太平洋標準時 (PST)</option>
+              <option value="Europe/London">グリニッジ標準時 (GMT)</option>
+              <option value="Europe/Paris">中央ヨーロッパ時間 (CET)</option>
+              <option value="Asia/Shanghai">中国標準時 (CST)</option>
+              <option value="Asia/Seoul">韓国標準時 (KST)</option>
+              <option value="Australia/Sydney">
+                オーストラリア東部標準時 (AEST)
+              </option>
+            </select>
+            <p class="description">日付・時刻の解釈に使用するタイムゾーン</p>
+          </div>
+        </section>
+
+        <!-- 日付形式設定 -->
+        <section class="setting-section">
+          <h2>日付形式設定</h2>
+
+          <div class="setting-item">
+            <label>優先する日付形式（上から順に適用）</label>
+            <div class="sortable-list" id="dateFormatsContainer">
+              <!-- JavaScriptで動的生成 -->
+            </div>
+            <p class="description">
+              日付を検出する際の優先順位を設定します。ドラッグで並び替えできます。
+            </p>
+          </div>
+        </section>
+
+        <!-- サイト固有設定 -->
+        <section class="setting-section">
+          <h2>サイト固有設定</h2>
+
+          <div class="setting-item">
+            <label for="rulesEnabled">
+              <input type="checkbox" id="rulesEnabled" name="rulesEnabled" />
+              サイト固有ルールを有効にする
+            </label>
+            <p class="description">
+              特定のウェブサイトで専用の抽出ルールを使用します
+            </p>
+          </div>
+
+          <div class="setting-item site-rules-hidden" id="siteRulesContainer">
+            <label>サイト固有ルール</label>
+            <div class="site-rules-list" id="siteRulesList">
+              <!-- JavaScriptで動的生成 -->
+            </div>
+            <button type="button" id="addSiteRuleBtn" class="secondary-btn">
+              + 新しいルールを追加
+            </button>
+            <p class="description">
+              特定のサイトで使用するCSSセレクターや抽出ルールを設定
+            </p>
+          </div>
+        </section>
+
+        <!-- アクションボタン -->
+        <section class="action-section">
+          <div class="button-group">
+            <button type="submit" id="saveBtn" class="primary-btn">
+              設定を保存
+            </button>
+            <button type="button" id="resetBtn" class="secondary-btn">
+              デフォルトに戻す
+            </button>
+          </div>
+        </section>
+      </form>
+
+      <!-- トースト通知エリア -->
+      <div id="toastContainer" class="toast-container"></div>
+
+      <!-- 確認ダイアログ -->
+      <div id="confirmModal" class="modal">
+        <div class="modal-content">
+          <h3 id="confirmTitle">確認</h3>
+          <p id="confirmMessage">この操作を実行しますか？</p>
+          <div class="modal-buttons">
+            <button id="confirmOk" class="primary-btn">OK</button>
+            <button id="confirmCancel" class="secondary-btn">キャンセル</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>ChronoClip v1.0 - ウェブページの日付をGoogleカレンダーに簡単追加</p>
+      <div class="test-button-container">
+        <button type="button" onclick="openTestPage()" class="test-button">
+          📊 設定システムのテストページを開く
+        </button>
+      </div>
+    </footer>
+
+    <!-- スクリプト読み込み -->
+    <script src="../lib/settings.js"></script>
+    <script src="options.js"></script>
+  </body>
 </html>

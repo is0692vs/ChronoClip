@@ -1,21 +1,22 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>ChronoClip</title>
-  <meta charset="UTF-8">
-  <link rel="stylesheet" href="popup.css">
-</head>
-<body>
-  <h1>ChronoClip</h1>
-  <p>ウェブページの日付情報を検出します。</p>
+  <head>
+    <title>ChronoClip</title>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <h1>ChronoClip</h1>
+    <p>ウェブページの日付情報を検出します。</p>
 
-  <div id="auth-status">
-    <p id="status-message">認証状態を確認中...</p>
-    <p id="user-info" style="display: none;"></p>
-    <button id="login-button" style="display: none;">Googleでログイン</button>
-    <button id="logout-button" style="display: none;">ログアウト</button>
-  </div>
+    <div id="auth-status">
+      <p id="status-message">認証状態を確認中...</p>
+      <p id="user-info" style="display: none"></p>
+      <button id="login-button" style="display: none">Googleでログイン</button>
+      <button id="logout-button" style="display: none">ログアウト</button>
+    </div>
 
-  <script src="popup.js"></script>
-</body>
+    <script src="../lib/settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
 </html>
