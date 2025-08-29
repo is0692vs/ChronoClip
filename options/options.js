@@ -26,7 +26,23 @@ let elements = {};
  * @returns {HTMLElement|null} 要素またはnull
  */
 function getElementSafe(elementId, elementName = null) {
-  const element = document.getElementById(elementId);
+  // 直接取得を試行
+  let element = document.getElementById(elementId);
+
+  // 見つからない場合はquerySelectorでも試行
+  if (!element) {
+    element = document.querySelector(`#${elementId}`);
+  }
+
+  // DOM読み込み待ちが必要かもしれない場合の遅延取得
+  if (!element && elementId === "siteRuleForm") {
+    // モーダル内の要素は初期化時に見つからない場合がある
+    console.log(
+      `ChronoClip: ${elementId} not found in initial load, will retry when needed`
+    );
+    return null;
+  }
+
   if (!element) {
     console.warn(
       `ChronoClip: Element not found: ${elementId} (${
@@ -304,16 +320,14 @@ function initializeElements() {
   };
 
   // 重要な要素の存在確認とデバッグ
-  const criticalElements = ["siteRuleForm", "siteRuleModal", "ruleDomain"];
+  const criticalElements = ["siteRuleModal", "ruleDomain"]; // siteRuleFormは動的取得するため除外
   console.log("ChronoClip: Checking critical elements...");
 
   let missingElements = [];
   for (const key of criticalElements) {
     const element = elements[key];
     const elementId =
-      key === "siteRuleForm"
-        ? "siteRuleForm"
-        : key === "siteRuleModal"
+      key === "siteRuleModal"
         ? "siteRuleModal"
         : key === "ruleDomain"
         ? "ruleDomain"
@@ -334,7 +348,14 @@ function initializeElements() {
     }
   }
 
-  // 欠けている要素の統計
+  // siteRuleFormは動的取得されるため、別途チェック
+  if (!elements.siteRuleForm) {
+    console.log(
+      "ChronoClip: siteRuleForm not found during initialization (will be retrieved dynamically)"
+    );
+  }
+
+  // 欠けている要素の統計 (siteRuleFormは除外)
   const totalElements = Object.keys(elements).length;
   const foundElements = Object.values(elements).filter(
     (el) => el !== null
@@ -1194,12 +1215,19 @@ async function updateSiteRulesUI() {
       const siteRuleManager =
         window.ChronoClipSiteRuleManager.getSiteRuleManager();
       await siteRuleManager.initialize();
-      const moduleRules = siteRuleManager.getAllRules();
+      const moduleRules = siteRuleManager.getAllRulesAsObject();
+
+      console.log(
+        "ChronoClip: Module rules from SiteRuleManager:",
+        moduleRules
+      );
+
       if (moduleRules && Object.keys(moduleRules).length > 0) {
         siteRules = { ...siteRules, ...moduleRules };
       }
     }
 
+    console.log("ChronoClip: Final combined site rules:", siteRules);
     const ruleEntries = Object.entries(siteRules);
 
     if (ruleEntries.length === 0) {
@@ -1232,8 +1260,19 @@ async function updateSiteRulesUI() {
           <div class="site-rule-domain">${domain}</div>
           <div class="site-rule-details">
             ${rule.inheritSubdomains ? "サブドメイン継承 | " : ""}
+            ${
+              rule.source
+                ? `ソース: ${rule.source === "code" ? "コード" : "UI"} | `
+                : ""
+            }
+            ${rule.priority ? `優先度: ${rule.priority} | ` : ""}
             ${rule.enabled ? "有効" : "無効"}
           </div>
+          ${
+            rule.extractorModule
+              ? `<div class="site-rule-extractor">抽出エンジン: ${rule.extractorModule}</div>`
+              : ""
+          }
         </div>
         <div class="site-rule-actions">
           <button type="button" class="secondary-btn small-btn" data-action="toggle" data-domain="${domain}">
@@ -1242,9 +1281,13 @@ async function updateSiteRulesUI() {
           <button type="button" class="secondary-btn small-btn" data-action="edit" data-domain="${domain}">
             編集
           </button>
-          <button type="button" class="danger-btn small-btn" data-action="delete" data-domain="${domain}">
+          ${
+            rule.source !== "code"
+              ? `<button type="button" class="danger-btn small-btn" data-action="delete" data-domain="${domain}">
             削除
-          </button>
+          </button>`
+              : ""
+          }
         </div>
       </div>
     `

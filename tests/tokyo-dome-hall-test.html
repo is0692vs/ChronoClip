@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>東京ドームホール抽出エンジンテスト</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .results {
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 5px;
+        margin-top: 15px;
+      }
+      .event-item {
+        background: white;
+        margin: 10px 0;
+        padding: 10px;
+        border-left: 4px solid #4caf50;
+      }
+      button {
+        background: #4caf50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      button:hover {
+        background: #45a049;
+      }
+      .error {
+        color: red;
+        background: #ffe6e6;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .success {
+        color: green;
+        background: #e6ffe6;
+        padding: 10px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>東京ドームホール抽出エンジンテスト</h1>
+
+      <div class="test-section">
+        <h2>1. 抽出エンジンロードテスト</h2>
+        <button onclick="testEngineLoad()">エンジンロードテスト</button>
+        <div id="load-results" class="results"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>2. ライブページ抽出テスト</h2>
+        <p>実際の東京ドームホールページから抽出テスト：</p>
+        <button onclick="testLiveExtraction()">ライブページから抽出</button>
+        <div id="live-results" class="results"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>3. モックデータ抽出テスト</h2>
+        <p>サンプルHTMLデータを使った抽出テスト：</p>
+        <button onclick="testMockExtraction()">モックデータから抽出</button>
+        <div id="mock-results" class="results"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>4. 特定時間帯イベント抽出テスト</h2>
+        <p>同じ日に複数のイベントがある場合の特定イベント抽出テスト：</p>
+        <button onclick="testSpecificTimeExtraction()">特定時間帯抽出</button>
+        <div id="specific-time-results" class="results"></div>
+
+        <!-- テスト用の東京ドームシティホール風HTML -->
+        <div id="test-dom-structure" style="display: none">
+          <div class="c-ttl-set-calender">2025年01月</div>
+          <table class="c-mod-calender">
+            <tbody>
+              <tr class="c-mod-calender__item">
+                <th class="c-mod-calender__title">
+                  <span class="c-mod-calender__day">03</span>
+                  <span class="c-mod-calender__weekday">(金)</span>
+                </th>
+                <td class="c-mod-calender__detail">
+                  <!-- 11:30のイベント -->
+                  <div
+                    class="c-mod-calender__detail-in"
+                    data-test-event="morning"
+                  >
+                    <div class="c-mod-calender__detail-col">
+                      <span class="dd">3</span>
+                    </div>
+                    <div class="c-mod-calender__detail-col">
+                      <p class="c-txt-tag">
+                        <span class="c-txt-tag__item is-bgcolor-e76e33"
+                          >プロレス</span
+                        >
+                      </p>
+                    </div>
+                    <div class="c-mod-calender__detail-col">
+                      <p class="c-mod-calender__links">
+                        <a href="http://www.noah.co.jp/" target="_blank"
+                          >プロレスリング・ノア</a
+                        >
+                      </p>
+                      <p class="c-mod-calender__time c-txt-caption-01">
+                        開始 11:30
+                      </p>
+                      <p class="c-txt-caption-01">
+                        ＜お問い合わせ＞プロレスリング・ノア公式HPからメールでお尋ねください
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- 18:00のイベント -->
+                  <div
+                    class="c-mod-calender__detail-in"
+                    data-test-event="evening"
+                  >
+                    <div class="c-mod-calender__detail-col">
+                      <span class="dd">3</span>
+                    </div>
+                    <div class="c-mod-calender__detail-col">
+                      <p class="c-txt-tag">
+                        <span class="c-txt-tag__item is-bgcolor-green"
+                          >コンサート</span
+                        >
+                      </p>
+                    </div>
+                    <div class="c-mod-calender__detail-col">
+                      <p class="c-mod-calender__links">
+                        <a href="http://example.com/" target="_blank"
+                          >音楽グループA</a
+                        >
+                      </p>
+                      <p class="c-mod-calender__time c-txt-caption-01">
+                        開始 18:00
+                      </p>
+                      <p class="c-txt-caption-01">
+                        ＜お問い合わせ＞公式サイトまでお問い合わせください
+                      </p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>5. サイトルール管理連携テスト</h2>
+        <button onclick="testSiteRuleIntegration()">
+          サイトルール連携テスト
+        </button>
+        <div id="rule-results" class="results"></div>
+      </div>
+    </div>
+
+    <!-- ChronoClip関連スクリプト -->
+    <script src="../lib/settings.js"></script>
+    <script src="../lib/site-rule-manager.js"></script>
+    <script src="../lib/extractors/base-extractor.js"></script>
+    <script src="../lib/extractors/tokyo-dome-hall-extractor.js"></script>
+    <script src="../lib/extractors/extractor-factory.js"></script>
+
+    <script>
+      // テスト関数
+      async function testEngineLoad() {
+        const results = document.getElementById("load-results");
+        results.innerHTML = "<p>テスト中...</p>";
+
+        try {
+          // エクストラクターが正しくロードされているかテスト
+          if (typeof window.ChronoClipTokyoDomeHallExtractor === "undefined") {
+            throw new Error("TokyoDomeHallExtractorがロードされていません");
+          }
+
+          const extractor = new window.ChronoClipTokyoDomeHallExtractor();
+
+          const config = extractor.getConfig();
+          console.log("エクストラクター設定:", config);
+
+          results.innerHTML = `
+                    <div class="success">
+                        <h3>✅ エンジンロード成功</h3>
+                        <p><strong>エンジン名:</strong> ${config.name}</p>
+                        <p><strong>対象ドメイン:</strong> ${config.domain}</p>
+                        <p><strong>説明:</strong> ${config.description}</p>
+                        <p><strong>URLパターン:</strong> ${config.urlPattern}</p>
+                    </div>
+                `;
+        } catch (error) {
+          results.innerHTML = `
+                    <div class="error">
+                        <h3>❌ エンジンロード失敗</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+          console.error("エンジンロードテストエラー:", error);
+        }
+      }
+
+      async function testLiveExtraction() {
+        const results = document.getElementById("live-results");
+        results.innerHTML = "<p>東京ドームホールページから抽出中...</p>";
+
+        try {
+          // 実際のページから抽出テスト（CORSの制限があるため、このテストは制限される可能性があります）
+          const response = await fetch(
+            "https://www.tokyo-dome.co.jp/hall/event/"
+          );
+          if (!response.ok) {
+            throw new Error(
+              "ページの取得に失敗しました（CORS制限の可能性があります）"
+            );
+          }
+
+          const html = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+
+          const extractor = new window.ChronoClipTokyoDomeHallExtractor();
+          const canExtract = extractor.canExtract(
+            "https://www.tokyo-dome.co.jp/hall/event/",
+            doc
+          );
+
+          if (!canExtract) {
+            throw new Error("抽出条件に一致しません");
+          }
+
+          const events = extractor.extract(doc);
+
+          let eventsHtml = "";
+          events.forEach((event) => {
+            eventsHtml += `
+                        <div class="event-item">
+                            <h4>${event.title}</h4>
+                            <p><strong>日時:</strong> ${event.startTime} ～ ${
+              event.endTime
+            }</p>
+                            <p><strong>場所:</strong> ${event.location}</p>
+                            <p><strong>詳細:</strong> ${event.description}</p>
+                            ${
+                              event.url
+                                ? `<p><strong>URL:</strong> <a href="${event.url}" target="_blank">${event.url}</a></p>`
+                                : ""
+                            }
+                        </div>
+                    `;
+          });
+
+          results.innerHTML = `
+                    <div class="success">
+                        <h3>✅ ライブ抽出成功</h3>
+                        <p>抽出されたイベント数: ${events.length}</p>
+                        ${eventsHtml}
+                    </div>
+                `;
+        } catch (error) {
+          results.innerHTML = `
+                    <div class="error">
+                        <h3>❌ ライブ抽出失敗</h3>
+                        <p>${error.message}</p>
+                        <p>注意: ブラウザのCORS制限により、ライブページからの抽出は制限される場合があります。</p>
+                    </div>
+                `;
+          console.error("ライブ抽出テストエラー:", error);
+        }
+      }
+
+      async function testMockExtraction() {
+        const results = document.getElementById("mock-results");
+        results.innerHTML = "<p>モックデータから抽出中...</p>";
+
+        try {
+          // サンプルHTMLを作成
+          const mockHtml = `
+                    <div class="c-ttl-set-calender">2025年09月</div>
+                    <table class="c-mod-calender">
+                        <tbody>
+                            <tr class="c-mod-calender__item">
+                                <th class="c-mod-calender__title">
+                                    <span class="c-mod-calender__day">08</span>
+                                    <span class="c-mod-calender__day">(月)</span>
+                                </th>
+                                <td class="c-mod-calender__detail">
+                                    <div class="c-mod-calender__detail-in">
+                                        <div class="c-mod-calender__detail-col">
+                                            <p class="c-txt-tag"><span class="c-txt-tag__item is-bgcolor-e76e33">プロレス</span></p>
+                                        </div>
+                                        <div class="c-mod-calender__detail-col">
+                                            <p class="c-mod-calender__links"><a href="http://www.noah.co.jp/" target="_blank">プロレスリング・ノア</a></p>
+                                            <p class="c-txt-caption-01">開始 18:30</p>
+                                            <p class="c-txt-caption-01">＜お問い合わせ＞プロレスリング・ノア公式HPからメールでお尋ねください</p>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(mockHtml, "text/html");
+
+          const extractor = new window.ChronoClipTokyoDomeHallExtractor();
+          const events = extractor.extract(doc);
+
+          let eventsHtml = "";
+          events.forEach((event) => {
+            eventsHtml += `
+                        <div class="event-item">
+                            <h4>${event.title}</h4>
+                            <p><strong>日時:</strong> ${event.startTime} ～ ${
+              event.endTime
+            }</p>
+                            <p><strong>場所:</strong> ${event.location}</p>
+                            <p><strong>詳細:</strong> ${event.description}</p>
+                            ${
+                              event.url
+                                ? `<p><strong>URL:</strong> <a href="${event.url}" target="_blank">${event.url}</a></p>`
+                                : ""
+                            }
+                        </div>
+                    `;
+          });
+
+          results.innerHTML = `
+                    <div class="success">
+                        <h3>✅ モック抽出成功</h3>
+                        <p>抽出されたイベント数: ${events.length}</p>
+                        ${eventsHtml}
+                    </div>
+                `;
+        } catch (error) {
+          results.innerHTML = `
+                    <div class="error">
+                        <h3>❌ モック抽出失敗</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+          console.error("モック抽出テストエラー:", error);
+        }
+      }
+
+      async function testSpecificTimeExtraction() {
+        const results = document.getElementById("specific-time-results");
+        results.innerHTML = "<p>特定時間帯イベント抽出テスト中...</p>";
+
+        try {
+          const extractor = new window.ChronoClipTokyoDomeHallExtractor();
+          const testDomStructure =
+            document.getElementById("test-dom-structure");
+
+          // 11:30のイベントブロックをテストコンテキストとして使用
+          const morningEventBlock = testDomStructure.querySelector(
+            '[data-test-event="morning"]'
+          );
+          const morningResult = await extractor.extractAll(morningEventBlock);
+
+          // 18:00のイベントブロックをテストコンテキストとして使用
+          const eveningEventBlock = testDomStructure.querySelector(
+            '[data-test-event="evening"]'
+          );
+          const eveningResult = await extractor.extractAll(eveningEventBlock);
+
+          let resultsHtml = `
+            <div class="success">
+              <h3>✅ 特定時間帯抽出テスト成功</h3>
+              
+              <h4>11:30イベント抽出結果:</h4>
+              <div class="event-item">
+                <p><strong>タイトル:</strong> ${
+                  morningResult.title || "なし"
+                }</p>
+                <p><strong>場所:</strong> ${
+                  morningResult.location || "なし"
+                }</p>
+                <p><strong>信頼度:</strong> ${(
+                  morningResult.confidence * 100
+                ).toFixed(1)}%</p>
+                <p><strong>イベント数:</strong> ${
+                  morningResult.events ? morningResult.events.length : 0
+                }</p>
+                ${
+                  morningResult.events && morningResult.events.length > 0
+                    ? `<p><strong>詳細:</strong> ${
+                        morningResult.events[0].description || "なし"
+                      }</p>
+                   <p><strong>開始時間:</strong> ${
+                     morningResult.events[0].startTime || "なし"
+                   }</p>`
+                    : ""
+                }
+              </div>
+              
+              <h4>18:00イベント抽出結果:</h4>
+              <div class="event-item">
+                <p><strong>タイトル:</strong> ${
+                  eveningResult.title || "なし"
+                }</p>
+                <p><strong>場所:</strong> ${
+                  eveningResult.location || "なし"
+                }</p>
+                <p><strong>信頼度:</strong> ${(
+                  eveningResult.confidence * 100
+                ).toFixed(1)}%</p>
+                <p><strong>イベント数:</strong> ${
+                  eveningResult.events ? eveningResult.events.length : 0
+                }</p>
+                ${
+                  eveningResult.events && eveningResult.events.length > 0
+                    ? `<p><strong>詳細:</strong> ${
+                        eveningResult.events[0].description || "なし"
+                      }</p>
+                   <p><strong>開始時間:</strong> ${
+                     eveningResult.events[0].startTime || "なし"
+                   }</p>`
+                    : ""
+                }
+              </div>
+              
+              <h4>抽出結果の比較:</h4>
+              <p>11:30と18:00で異なるイベントが抽出されました: ${
+                morningResult.title !== eveningResult.title
+                  ? "✅ 成功"
+                  : "❌ 失敗"
+              }</p>
+            </div>
+          `;
+
+          results.innerHTML = resultsHtml;
+
+          console.log("11:30イベント抽出結果:", morningResult);
+          console.log("18:00イベント抽出結果:", eveningResult);
+        } catch (error) {
+          results.innerHTML = `
+            <div class="error">
+              <h3>❌ 特定時間帯抽出テスト失敗</h3>
+              <p>${error.message}</p>
+              <pre>${error.stack}</pre>
+            </div>
+          `;
+          console.error("特定時間帯抽出テストエラー:", error);
+        }
+      }
+
+      async function testSiteRuleIntegration() {
+        const results = document.getElementById("rule-results");
+        results.innerHTML = "<p>サイトルール連携をテスト中...</p>";
+
+        try {
+          if (typeof window.ChronoClipSiteRuleManager === "undefined") {
+            throw new Error("SiteRuleManagerがロードされていません");
+          }
+
+          if (typeof window.ChronoClipExtractorFactory === "undefined") {
+            throw new Error("ExtractorFactoryがロードされていません");
+          }
+
+          const siteRuleManager =
+            window.ChronoClipSiteRuleManager.getSiteRuleManager();
+          await siteRuleManager.initialize();
+
+          // 東京ドームホール用のルールを取得
+          const rule = siteRuleManager.getRuleForDomain("www.tokyo-dome.co.jp");
+
+          if (!rule) {
+            throw new Error("東京ドームホール用のルールが見つかりません");
+          }
+
+          // ExtractorFactoryを使った抽出テスト
+          const factory =
+            window.ChronoClipExtractorFactory.getExtractorFactory();
+          const mockContext = document.createElement("div");
+          mockContext.innerHTML = `
+            <div class="c-mod-calender">
+              <div class="c-mod-calender__item">
+                <div class="c-mod-calender__day">15</div>
+                <div class="c-mod-calender__detail-in">
+                  <div class="c-mod-calender__links">テストイベント</div>
+                  <div class="c-txt-caption-01">開始 19:00</div>
+                </div>
+              </div>
+            </div>
+          `;
+
+          const extractionResult = await factory.extract(
+            mockContext,
+            "www.tokyo-dome.co.jp"
+          );
+
+          results.innerHTML = `
+                    <div class="success">
+                        <h3>✅ サイトルール連携成功</h3>
+                        <h4>ルール情報:</h4>
+                        <p><strong>ドメイン:</strong> ${rule.domain}</p>
+                        <p><strong>優先度:</strong> ${rule.priority}</p>
+                        <p><strong>抽出エンジン:</strong> ${
+                          rule.extractorModule || "auto-detected"
+                        }</p>
+                        <p><strong>ソース:</strong> ${rule.source}</p>
+                        <p><strong>有効:</strong> ${
+                          rule.enabled ? "はい" : "いいえ"
+                        }</p>
+                        
+                        <h4>抽出テスト結果:</h4>
+                        <p><strong>エクストラクター:</strong> ${
+                          extractionResult.extractor
+                        }</p>
+                        <p><strong>信頼度:</strong> ${(
+                          extractionResult.confidence * 100
+                        ).toFixed(1)}%</p>
+                        <p><strong>タイトル:</strong> ${
+                          extractionResult.title || "なし"
+                        }</p>
+                        <p><strong>場所:</strong> ${
+                          extractionResult.location || "なし"
+                        }</p>
+                        <p><strong>イベント数:</strong> ${
+                          extractionResult.events
+                            ? extractionResult.events.length
+                            : 0
+                        }</p>
+                        ${
+                          extractionResult.ruleUsed
+                            ? `<p><strong>使用されたルール:</strong> ${extractionResult.ruleUsed.domain} (${extractionResult.ruleUsed.extractorUsed})</p>`
+                            : ""
+                        }
+                    </div>
+                `;
+        } catch (error) {
+          results.innerHTML = `
+                    <div class="error">
+                        <h3>❌ サイトルール連携失敗</h3>
+                        <p>${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+          console.error("サイトルール連携テストエラー:", error);
+        }
+      }
+
+      // ページロード時の初期化
+      window.addEventListener("DOMContentLoaded", () => {
+        console.log(
+          "東京ドームホール抽出エンジンテストページが読み込まれました"
+        );
+      });
+    </script>
+  </body>
+</html>

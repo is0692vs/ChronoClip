@@ -568,6 +568,8 @@ const ignoreSelectors = [
 
     // イベント情報を自動抽出
     let extractedEvent = null;
+    let shouldShowDefaultPopup = true; // デフォルトポップアップを表示するかのフラグ
+
     try {
       if (window.ChronoClipExtractor && e.target) {
         // オプション設定を取得
@@ -598,11 +600,61 @@ const ignoreSelectors = [
         );
         performanceMonitor.extractionCalls++;
         console.log("ChronoClip: Extracted event context:", extractedEvent);
+
+        // extractedEventがPromiseの場合は結果を待つ
+        if (extractedEvent && typeof extractedEvent.then === "function") {
+          shouldShowDefaultPopup = false; // デフォルトポップアップを無効化
+
+          try {
+            const result = await extractedEvent;
+            console.log("ChronoClip: Resolved extracted event:", result);
+            // 抽出結果があり、有効なデータがある場合はポップアップを表示
+            if (result && (result.title || result.date || result.events)) {
+              console.log("ChronoClip: Showing popup with extracted data");
+              showQuickAddPopupWithData(result);
+              return; // 抽出結果ポップアップを表示したので終了
+            } else {
+              // 抽出結果が無効な場合はデフォルトポップアップを表示
+              console.log(
+                "ChronoClip: No valid extracted data, showing default popup"
+              );
+              shouldShowDefaultPopup = true;
+            }
+          } catch (error) {
+            console.error(
+              "ChronoClip: Error resolving extracted event:",
+              error
+            );
+            // エラーの場合もデフォルトポップアップを表示
+            shouldShowDefaultPopup = true;
+          }
+        } else if (
+          extractedEvent &&
+          (extractedEvent.title || extractedEvent.date || extractedEvent.events)
+        ) {
+          // 同期的な結果の場合
+          console.log("ChronoClip: Showing popup with extracted data (sync)");
+          showQuickAddPopupWithData(extractedEvent);
+          return; // ポップアップが表示された場合は通常のポップアップは表示しない
+        }
       }
     } catch (error) {
       console.error("ChronoClip: Error extracting event context:", error);
     }
 
+    // デフォルトポップアップを表示するかチェック
+    if (!shouldShowDefaultPopup) {
+      return;
+    }
+
+    // デフォルトポップアップの表示処理
+    showDefaultQuickAddPopup(normalizedDate, time, e);
+  }
+
+  /**
+   * デフォルトのクイック追加ポップアップを表示
+   */
+  async function showDefaultQuickAddPopup(normalizedDate, time, e) {
     quickAddPopupHost = document.createElement("div");
     quickAddPopupHost.style.position = "absolute";
     quickAddPopupHost.style.zIndex =
@@ -615,6 +667,11 @@ const ignoreSelectors = [
       // Extension context が有効かチェック
       if (!chrome.runtime?.id) {
         console.error("ChronoClip: Extension context invalidated");
+        // Extension contextが無効な場合は、ページリロードを促すメッセージを表示
+        showToast(
+          "error",
+          "拡張機能が再読み込みされました。ページをリロードしてください。"
+        );
         return;
       }
 
@@ -690,23 +747,8 @@ const ignoreSelectors = [
         }
       }
 
-      // 抽出されたイベント情報をフォームに自動入力
-      if (extractedEvent) {
-        const eventTitleInput = shadowRoot.getElementById("event-title");
-        const eventDetailsInput = shadowRoot.getElementById("event-details");
-
-        if (eventTitleInput && extractedEvent.title && !eventTitleInput.value) {
-          eventTitleInput.value = extractedEvent.title;
-        }
-
-        if (
-          eventDetailsInput &&
-          extractedEvent.description &&
-          !eventDetailsInput.value
-        ) {
-          eventDetailsInput.value = extractedEvent.description;
-        }
-      }
+      // 抽出されたイベント情報は新しい関数では使用不可
+      // デフォルトポップアップでは抽出情報なしで表示
 
       // ポップアップの位置を調整
       const popupElement = shadowRoot.querySelector(
@@ -1372,10 +1414,44 @@ function showQuickAddPopupWithData(extractedData) {
 
     // 抽出されたデータから日付情報を準備
     let dateInfo = null;
+
+    console.log("ChronoClip: Checking extracted date data:", {
+      dateTime: extractedData.dateTime,
+      date: extractedData.date,
+      events: extractedData.events,
+    });
+
     if (extractedData.dateTime) {
       dateInfo = extractedData.dateTime;
-      console.log("ChronoClip: Using extracted date info:", dateInfo);
-    } else {
+      console.log("ChronoClip: Using extracted dateTime:", dateInfo);
+    } else if (extractedData.date) {
+      // date フィールドから日付情報を作成
+      const dateObj = new Date(extractedData.date);
+      if (!isNaN(dateObj.getTime())) {
+        dateInfo = {
+          type: "date",
+          start: { date: formatDate(dateObj) },
+          end: { date: formatDate(dateObj) },
+        };
+        console.log("ChronoClip: Created date info from date field:", dateInfo);
+      }
+    } else if (extractedData.events && extractedData.events.length > 0) {
+      // eventsフィールドから日付情報を作成
+      const firstEvent = extractedData.events[0];
+      if (firstEvent.startTime) {
+        const dateObj = new Date(firstEvent.startTime);
+        if (!isNaN(dateObj.getTime())) {
+          dateInfo = {
+            type: "datetime",
+            start: { dateTime: firstEvent.startTime },
+            end: { dateTime: firstEvent.endTime || firstEvent.startTime },
+          };
+          console.log("ChronoClip: Created date info from events:", dateInfo);
+        }
+      }
+    }
+
+    if (!dateInfo) {
       // デフォルトは明日の日付
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1388,11 +1464,30 @@ function showQuickAddPopupWithData(extractedData) {
     }
 
     // タイトルと詳細を準備
-    const title = extractedData.title || "イベント";
-    const description =
+    let title = extractedData.title;
+    let description =
       extractedData.description || extractedData.source?.selectionText || "";
 
-    console.log("ChronoClip: Prepared title and description:", {
+    // タイトルが取得できていない場合、eventsからタイトルを取得
+    if (!title && extractedData.events && extractedData.events.length > 0) {
+      title = extractedData.events[0].title;
+      console.log("ChronoClip: Using title from events:", title);
+    }
+
+    // 詳細が取得できていない場合、eventsから詳細を取得
+    if (
+      !description &&
+      extractedData.events &&
+      extractedData.events.length > 0
+    ) {
+      description = extractedData.events[0].description;
+      console.log("ChronoClip: Using description from events:", description);
+    }
+
+    // 最終的なフォールバック
+    title = title || "イベント";
+
+    console.log("ChronoClip: Final title and description:", {
       title,
       description,
     });

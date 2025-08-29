@@ -616,9 +616,22 @@ function extractEventContext(dateElement, options = {}) {
   if (window.ChronoClipExtractorFactory) {
     try {
       const factory = window.ChronoClipExtractorFactory.getExtractorFactory();
+
+      // コンテキスト要素を適切に設定
+      // dateElementが属するコンテナ要素を使用
+      const context =
+        dateElement.closest("article, section, div, .event, .product, .card") ||
+        dateElement.parentElement ||
+        dateElement;
+
       return factory
-        .extract(dateElement, domain)
+        .extract(context, domain)
         .then((result) => {
+          console.log(
+            `ChronoClip: Modular extraction result for ${domain}:`,
+            result
+          );
+
           // レガシー形式に変換
           return {
             title: result.title,
