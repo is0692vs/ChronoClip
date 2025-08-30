@@ -205,6 +205,10 @@ class ExtractorFactory {
         result.error = error.message;
         result.fallback = true;
       }
+      if (result) {
+        result.error = error.message;
+        result.fallback = true;
+      }
 
       return result;
     }
