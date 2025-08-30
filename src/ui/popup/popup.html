@@ -16,7 +16,45 @@
       <button id="logout-button" style="display: none">ログアウト</button>
     </div>
 
-    <script src="../lib/settings.js"></script>
+    <!-- エラー表示エリア -->
+    <div id="error-notification" class="error-notification hidden">
+      <div class="error-header">
+        <span class="error-icon">⚠️</span>
+        <span id="error-title" class="error-title">エラーが発生しました</span>
+        <button id="error-close" class="error-close">&times;</button>
+      </div>
+      <div id="error-message" class="error-message"></div>
+      <div id="error-details" class="error-details hidden">
+        <div class="error-details-content">
+          <strong>詳細情報:</strong>
+          <pre id="error-details-text"></pre>
+        </div>
+      </div>
+      <div class="error-actions">
+        <button id="error-toggle-details" class="error-action-btn">
+          詳細表示
+        </button>
+        <button id="error-retry" class="error-action-btn primary hidden">
+          再試行
+        </button>
+        <button id="error-report" class="error-action-btn">レポート送信</button>
+      </div>
+    </div>
+
+    <!-- 成功通知エリア -->
+    <div id="success-notification" class="success-notification hidden">
+      <div class="success-header">
+        <span class="success-icon">✅</span>
+        <span id="success-message" class="success-message"
+          >処理が完了しました</span
+        >
+        <button id="success-close" class="success-close">&times;</button>
+      </div>
+    </div>
+
+    <script src="../../shared/logger.js"></script>
+    <script src="../../shared/error-handler.js"></script>
+    <script src="../../shared/settings.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

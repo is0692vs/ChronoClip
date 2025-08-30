@@ -174,13 +174,15 @@ class ExtractorFactory {
 
       const result = await extractor.extractAll(context);
 
-      // ルール情報を結果に追加
-      result.ruleUsed = {
-        domain: rule.domain,
-        source: rule.source,
-        priority: rule.priority,
-        extractorUsed: extractor.constructor.name,
-      };
+      // ルール情報を結果に追加（resultがnullでない場合のみ）
+      if (result) {
+        result.ruleUsed = {
+          domain: rule.domain,
+          source: rule.source,
+          priority: rule.priority,
+          extractorUsed: extractor.constructor.name,
+        };
+      }
 
       return result;
     } catch (error) {
@@ -197,8 +199,12 @@ class ExtractorFactory {
       };
       const extractor = this.getExtractor(domain, fallbackRule);
       const result = await extractor.extractAll(context);
-      result.error = error.message;
-      result.fallback = true;
+
+      // フォールバック情報を結果に追加（resultがnullでない場合のみ）
+      if (result) {
+        result.error = error.message;
+        result.fallback = true;
+      }
 
       return result;
     }

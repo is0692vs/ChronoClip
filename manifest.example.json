@@ -28,6 +28,8 @@
       "js": [
         "config/constants.js",
         "config/site-patterns.js",
+        "src/shared/logger.js",
+        "src/shared/error-handler.js",
         "src/shared/settings.js",
         "src/shared/site-rule-manager.js",
         "src/shared/extractors/base-extractor.js",

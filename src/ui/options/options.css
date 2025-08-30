@@ -771,3 +771,125 @@ textarea:focus {
     border: 2px solid #000;
   }
 }
+
+/* デバッグ・監視設定のスタイル */
+.debug-buttons {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.debug-buttons .secondary-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.debug-logs.hidden,
+.system-info.hidden {
+  display: none;
+}
+
+.debug-log-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.debug-log-controls .select-input {
+  width: auto;
+  min-width: 120px;
+}
+
+.debug-logs-output {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 12px;
+  border-radius: 6px;
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.debug-log-entry {
+  margin-bottom: 2px;
+  padding: 2px 0;
+}
+
+.debug-log-entry.debug {
+  color: #9cdcfe;
+}
+
+.debug-log-entry.info {
+  color: #4fc1ff;
+}
+
+.debug-log-entry.warn {
+  color: #ffcc02;
+}
+
+.debug-log-entry.error {
+  color: #f48771;
+}
+
+.debug-log-entry.fatal {
+  color: #f14c4c;
+  font-weight: bold;
+}
+
+.log-timestamp {
+  color: #808080;
+  font-size: 11px;
+}
+
+.log-context {
+  color: #c586c0;
+}
+
+.system-info-output {
+  background: #f8f9fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.system-info-section {
+  margin-bottom: 16px;
+}
+
+.system-info-section:last-child {
+  margin-bottom: 0;
+}
+
+.system-info-section h4 {
+  color: #24292e;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e1e4e8;
+  padding-bottom: 4px;
+}
+
+.system-info-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.system-info-key {
+  color: #586069;
+  font-weight: 500;
+}
+
+.system-info-value {
+  color: #24292e;
+  word-break: break-word;
+  max-width: 60%;
+  text-align: right;
+}

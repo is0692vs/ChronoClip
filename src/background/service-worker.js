@@ -1,12 +1,80 @@
-importScripts("../shared/calendar.js");
-// background/service-worker.js
+// Service Worker開始確認
+console.log("ChronoClip Service Worker Starting");
 
-console.log("ChronoClip Service Worker loaded.");
+try {
+  importScripts("../shared/calendar.js");
+} catch (error) {
+  console.error("Failed to load calendar.js:", error);
+  // calendar.jsがないとカレンダー機能が動作しない
+}
+
+try {
+  importScripts("../shared/logger.js");
+} catch (error) {
+  console.error("Failed to load logger.js:", error);
+}
+
+try {
+  importScripts("../shared/error-handler.js");
+} catch (error) {
+  console.error("Failed to load error-handler.js:", error);
+}
+
+// ChronoClip Service Worker初期化
+
+// ChronoClipの初期化
+let logger, errorHandler;
+
+// Service Worker起動時の初期化
+async function initializeServiceWorker() {
+  try {
+    // Service Worker環境ではselfを使用
+    if (self.ChronoClipLogger) {
+      logger = new self.ChronoClipLogger();
+    }
+
+    if (self.ChronoClipErrorHandler) {
+      errorHandler = new self.ChronoClipErrorHandler();
+    }
+
+    if (!logger || !errorHandler) {
+      throw new Error("Logger or ErrorHandler not loaded");
+    }
+
+    logger.info("ChronoClip Service Worker initialized successfully");
+  } catch (error) {
+    console.error("ChronoClip: Service Worker initialization failed:", error);
+    // フォールバック処理
+    logger = {
+      info: console.log,
+      warn: console.warn,
+      error: console.error,
+      fatal: console.error,
+      debug: console.log,
+      startProcess: () => {},
+      endProcess: () => {},
+      apiCall: () => {},
+      apiResult: () => {},
+      setDebugMode: () => {},
+    };
+    errorHandler = {
+      handleError: (error, context) => {
+        console.error("ChronoClip Error:", error, context);
+        return { userMessage: { message: "予期しないエラーが発生しました" } };
+      },
+    };
+  }
+}
+
+// 初期化実行
+initializeServiceWorker();
 
 /**
  * @fileoverview ChronoClip拡張機能のサービスワーカーです。
  * 発見された日付などのコンテンツスクリプトからのメッセージをリッスンし、
  * データの保存や他のChrome APIとの対話などのバックグラウンドタスクを実行できます。
+ *
+ * エラーハンドリング：全ての外部API呼び出しをラップし、適切なエラー分類とログを提供
  */
 
 const USER_INFO_API_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
@@ -15,154 +83,436 @@ const STORAGE_KEY_ACCESS_TOKEN = "googleAccessToken";
 const STORAGE_KEY_USER_INFO = "googleUserInfo";
 
 /**
+ * 外部API呼び出しのラッパー関数（エラーハンドリング付き）
+ */
+async function safeApiCall(url, options = {}, context = {}) {
+  const method = options.method || "GET";
+
+  try {
+    logger?.apiCall(method, url, { context });
+
+    const response = await fetch(url, options);
+    const status = response.status;
+
+    logger?.apiResult(method, url, status, { ok: response.ok });
+
+    if (!response.ok) {
+      const errorData = {
+        status,
+        statusText: response.statusText,
+        url,
+        method,
+      };
+
+      // レスポンス本文を安全に取得
+      try {
+        const text = await response.text();
+        if (text) {
+          errorData.responseText = text.substring(0, 500); // 最初の500文字のみ
+        }
+      } catch (e) {
+        // レスポンス本文の取得に失敗した場合は無視
+      }
+
+      const error = new Error(
+        `API call failed: ${status} ${response.statusText}`
+      );
+      error.status = status;
+      error.context = context;
+
+      throw error;
+    }
+
+    return response;
+  } catch (error) {
+    const handled = errorHandler?.handleError(error, {
+      type: "api_call",
+      url,
+      method,
+      ...context,
+    });
+
+    // エラーを再スローして呼び出し元に伝播
+    error.handled = handled;
+    throw error;
+  }
+}
+
+/**
+ * Chrome Storage APIのラッパー関数（エラーハンドリング付き）
+ */
+async function safeStorageGet(keys) {
+  try {
+    logger?.debug("Storage get operation", { keys });
+    return await chrome.storage.sync.get(keys);
+  } catch (error) {
+    errorHandler?.handleError(error, { type: "storage_get", keys });
+    throw error;
+  }
+}
+
+async function safeStorageSet(data) {
+  try {
+    logger?.debug("Storage set operation", { keys: Object.keys(data) });
+    await chrome.storage.sync.set(data);
+    logger?.debug("Storage set completed successfully");
+  } catch (error) {
+    errorHandler?.handleError(error, {
+      type: "storage_set",
+      keys: Object.keys(data),
+    });
+    throw error;
+  }
+}
+
+async function safeStorageRemove(keys) {
+  try {
+    logger?.debug("Storage remove operation", { keys });
+    await chrome.storage.sync.remove(keys);
+    logger?.debug("Storage remove completed successfully");
+  } catch (error) {
+    errorHandler?.handleError(error, { type: "storage_remove", keys });
+    throw error;
+  }
+}
+
+/**
  * アクセストークンを使い、Googleからユーザー情報を取得します。
  * @param {string} token - OAuthアクセストークン
  * @returns {Promise<object>} ユーザー情報のオブジェクト
  */
 async function fetchUserInfo(token) {
-  const response = await fetch(
-    "https://www.googleapis.com/oauth2/v3/userinfo",
+  const response = await safeApiCall(
+    USER_INFO_API_URL,
     {
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
+    { operation: "fetch_user_info" }
   );
+
   return await response.json();
 }
+
+console.log("ChronoClip: Setting up message listener");
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("ChronoClip: Message received in service worker.", message);
+  console.log("ChronoClip: Message received in service worker", {
+    type: message.type,
+    sender: sender.tab?.url,
+  });
 
-  switch (message.type) {
-    case "content_script_loaded":
-      // ...
-      break;
+  logger?.debug("Message received in service worker", {
+    type: message.type,
+    sender: sender.tab?.url,
+  });
 
-    case "dates_found":
-      // ...
-      break;
+  // 非同期処理のためのラッパー
+  const handleMessageAsync = async () => {
+    try {
+      console.log("ChronoClip: Processing message type:", message.type);
+      switch (message.type) {
+        case "content_script_loaded":
+          // ...
+          break;
 
-    case "settings:updated":
-      // 設定変更をすべてのタブに通知
-      handleSettingsUpdate(message.settings);
-      sendResponse({ success: true });
-      break;
+        case "dates_found":
+          // ...
+          break;
 
-    case "auth_login":
-      chrome.identity.getAuthToken({ interactive: true }, async (token) => {
-        if (chrome.runtime.lastError || !token) {
-          sendResponse({
-            success: false,
-            error: chrome.runtime.lastError?.message,
-          });
-        } else {
-          // ログイン成功後、ユーザー情報を取得して返す
-          const userInfo = await fetchUserInfo(token);
-          sendResponse({ success: true, userInfo: userInfo });
-        }
+        case "settings:updated":
+          // 設定変更をすべてのタブに通知
+          await handleSettingsUpdate(message.settings);
+          return { success: true };
+
+        case "auth_login":
+          return await handleAuthLogin();
+
+        case "auth_logout":
+          return await handleAuthLogout();
+
+        case "auth_status":
+        case "auth_check_status":
+          return await handleAuthStatus();
+
+        case "add_to_calendar":
+          return await handleAddToCalendar(message.eventData);
+
+        case "calendar:createEvent":
+          return await handleAddToCalendar(message.payload);
+
+        case "retry_failed_items":
+          return await handleRetryFailedItems(message.items);
+
+        case "ping":
+          return { success: true, message: "pong" };
+
+        default:
+          logger?.warn("Unknown message type received", { type: message.type });
+          return { success: false, error: "Unknown message type" };
+      }
+    } catch (error) {
+      const handled = errorHandler?.handleError(error, {
+        type: "message_handler",
+        messageType: message.type,
       });
-      break; // caseを終了
 
-    case "auth_logout":
-      chrome.identity.getAuthToken({ interactive: false }, (token) => {
+      logger?.error("Message handler error", {
+        messageType: message.type,
+        error: error.message,
+      });
+
+      return {
+        success: false,
+        error: handled?.userMessage?.message || "処理中にエラーが発生しました",
+        details: handled?.details,
+      };
+    }
+  };
+
+  // 非同期処理を実行
+  handleMessageAsync()
+    .then((response) => {
+      console.log("ChronoClip: Sending response to content script:", response);
+      sendResponse(response || { success: true });
+    })
+    .catch((error) => {
+      console.error("ChronoClip: Critical error in message handler:", error);
+      logger?.fatal("Critical error in message handler", {
+        error: error.message,
+      });
+      const errorResponse = {
+        success: false,
+        error: "重大なエラーが発生しました。拡張機能を再起動してください。",
+      };
+      console.log("ChronoClip: Sending error response:", errorResponse);
+      sendResponse(errorResponse);
+    });
+
+  // 非同期処理のため true を返す
+  return true;
+});
+
+/**
+ * 認証ログイン処理
+ */
+async function handleAuthLogin() {
+  return new Promise((resolve) => {
+    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+      try {
+        if (chrome.runtime.lastError || !token) {
+          const error = new Error(
+            chrome.runtime.lastError?.message || "Authentication failed"
+          );
+          error.status = 401;
+          throw error;
+        }
+
+        // ログイン成功後、ユーザー情報を取得
+        const userInfo = await fetchUserInfo(token);
+
+        logger?.info("User authentication successful", {
+          email: userInfo.email,
+        });
+
+        const response = { success: true, userInfo };
+        resolve(response);
+      } catch (error) {
+        const handled = errorHandler?.handleError(error, {
+          type: "auth_login",
+        });
+
+        const errorResponse = {
+          success: false,
+          error: handled?.userMessage?.message || "ログインに失敗しました",
+        };
+
+        resolve(errorResponse);
+      }
+    });
+  });
+}
+
+/**
+ * 認証ログアウト処理
+ */
+async function handleAuthLogout() {
+  return new Promise((resolve) => {
+    chrome.identity.getAuthToken({ interactive: false }, async (token) => {
+      try {
         if (token) {
           // Google側の認証を無効化
-          fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`);
+          await safeApiCall(
+            `${REVOKE_TOKEN_URL}?token=${token}`,
+            {},
+            { operation: "revoke_token" }
+          );
+
           // 拡張機能のキャッシュからトークンを削除
-          chrome.identity.removeCachedAuthToken({ token: token }, () => {
-            sendResponse({ success: true });
+          chrome.identity.removeCachedAuthToken({ token }, () => {
+            logger?.info("User logout successful");
+            resolve({ success: true });
           });
         } else {
-          sendResponse({ success: false, error: "No token to logout." });
+          resolve({
+            success: false,
+            error: "ログアウトするトークンがありません",
+          });
         }
-      });
-      break; // caseを終了
+      } catch (error) {
+        const handled = errorHandler?.handleError(error, {
+          type: "auth_logout",
+        });
+        resolve({
+          success: false,
+          error: handled?.userMessage?.message || "ログアウトに失敗しました",
+        });
+      }
+    });
+  });
+}
 
-    case "auth_check_status":
-      chrome.identity.getAuthToken({ interactive: false }, async (token) => {
+/**
+ * 認証ステータス確認処理
+ */
+async function handleAuthStatus() {
+  return new Promise((resolve) => {
+    chrome.identity.getAuthToken({ interactive: false }, async (token) => {
+      try {
         if (chrome.runtime.lastError || !token) {
-          sendResponse({ loggedIn: false });
+          resolve({ loggedIn: false });
         } else {
-          // ログイン済みの場合、ユーザー情報を取得して返す
+          // ログイン済みの場合、ユーザー情報を取得
           const userInfo = await fetchUserInfo(token);
-          sendResponse({ loggedIn: true, userInfo: userInfo });
+          resolve({ loggedIn: true, userInfo });
         }
-      });
-      break; // caseを終了
-
-    case "calendar:createEvent":
-      console.log("ChronoClip: Received calendar:createEvent", message.payload);
-
-      // ペイロードの検証
-      if (!message.payload) {
-        console.error("ChronoClip: No payload provided");
-        sendResponse({
-          ok: false,
-          code: 400,
-          message: "ペイロードが提供されていません",
+      } catch (error) {
+        // ユーザー情報取得に失敗した場合は未ログイン扱い
+        logger?.warn("Failed to fetch user info during status check", {
+          error: error.message,
         });
-        break;
+        resolve({ loggedIn: false });
       }
+    });
+  });
+}
 
-      if (!message.payload.summary) {
-        console.error("ChronoClip: No summary provided", message.payload);
-        sendResponse({
-          ok: false,
-          code: 400,
-          message: "イベントタイトルが必要です",
-        });
-        break;
+/**
+ * カレンダーイベント追加処理
+ */
+async function handleAddToCalendar(eventData) {
+  try {
+    logger?.startProcess("calendar_event_creation", {
+      title: eventData.summary,
+    });
+
+    // ペイロードの検証
+    if (!eventData) {
+      throw new Error("イベントデータが提供されていません");
+    }
+    if (!eventData.summary) {
+      throw new Error("イベントタイトルが必要です");
+    }
+    if (!eventData.start) {
+      throw new Error("開始時刻が必要です");
+    }
+
+    // カレンダーAPIを呼び出し
+    const result = await createEvent(eventData);
+
+    logger?.endProcess("calendar_event_creation", {
+      eventId: result.id,
+      title: eventData.summary,
+    });
+
+    return { success: true, event: result };
+  } catch (error) {
+    // 認証エラーの場合、自動的にログインを試行
+    if (
+      error.code === 401 ||
+      error.status === 401 ||
+      error.message?.includes("auth") ||
+      error.message?.includes("token")
+    ) {
+      try {
+        const loginResult = await handleAuthLogin();
+        if (loginResult.success) {
+          // 再度カレンダーイベント作成を試行
+          const retryResult = await createEvent(eventData);
+
+          logger?.endProcess("calendar_event_creation", {
+            eventId: retryResult.id,
+            title: eventData.summary,
+          });
+
+          return { success: true, event: retryResult };
+        } else {
+          return {
+            success: false,
+            error: `ログインが必要です: ${loginResult.error}`,
+            needsLogin: true,
+          };
+        }
+      } catch (loginError) {
+        return {
+          success: false,
+          error: "ログインに失敗しました。手動でログインしてください。",
+          needsLogin: true,
+        };
       }
+    }
 
-      if (!message.payload.start) {
-        console.error("ChronoClip: No start time provided", message.payload);
-        sendResponse({ ok: false, code: 400, message: "開始時刻が必要です" });
-        break;
-      }
+    const handled = errorHandler?.handleError(error, {
+      type: "calendar_creation",
+      eventTitle: eventData?.summary,
+    });
 
-      if (!message.payload.end) {
-        console.error("ChronoClip: No end time provided", message.payload);
-        sendResponse({ ok: false, code: 400, message: "終了時刻が必要です" });
-        break;
-      }
+    return {
+      success: false,
+      error:
+        handled?.userMessage?.message || "カレンダーへの追加に失敗しました",
+    };
+  }
+}
 
-      createEvent(message.payload)
-        .then((event) => {
-          showNotification(
-            "success",
-            "イベントを追加しました",
-            event.summary,
-            event.htmlLink
-          );
-          sendResponse({
-            ok: true,
-            eventId: event.id,
-            htmlLink: event.htmlLink,
+/**
+ * 設定更新処理
+ */
+async function handleSettingsUpdate(settings) {
+  try {
+    logger?.info("Settings update received", { keys: Object.keys(settings) });
+
+    // デバッグモードの変更を検出
+    if (settings.debugMode !== undefined) {
+      logger?.setDebugMode(settings.debugMode);
+      logger?.info(`Debug mode ${settings.debugMode ? "enabled" : "disabled"}`);
+    }
+
+    // 全てのタブに設定変更を通知
+    const tabs = await chrome.tabs.query({});
+    const notifications = tabs.map((tab) =>
+      chrome.tabs
+        .sendMessage(tab.id, {
+          type: "settings:updated",
+          settings,
+        })
+        .catch((error) => {
+          // 一部のタブで失敗しても継続
+          logger?.debug("Failed to notify tab of settings update", {
+            tabId: tab.id,
+            url: tab.url,
           });
         })
-        .catch((err) => {
-          console.error("Failed to create event:", err);
-          const errorMessage = getErrorMessage(err);
-          showNotification(
-            "error",
-            "イベントの追加に失敗しました",
-            errorMessage
-          );
-          sendResponse({ ok: false, code: err.code, message: errorMessage });
-        });
-      break;
+    );
 
-    default:
-      console.warn(
-        "ChronoClip: Received an unknown message type:",
-        message.type
-      );
-      sendResponse({ status: "Unknown message type" });
-      break;
+    await Promise.allSettled(notifications);
+    logger?.info("Settings update notifications sent to all tabs");
+  } catch (error) {
+    errorHandler?.handleError(error, { type: "settings_update" });
+    throw error;
   }
-
-  return true; // Indicate asynchronous response
-});
+}
 
 /**
  * Shows a notification to the user.
@@ -359,4 +709,89 @@ function handleSettingsUpdate(settings) {
       );
     });
   });
+}
+
+/**
+ * 失敗したアイテムの再試行処理
+ * @param {Array} items - 失敗したアイテムのリスト
+ * @returns {Object} 再試行結果
+ */
+async function handleRetryFailedItems(items) {
+  try {
+    logger?.info("Starting retry for failed items", { count: items.length });
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw new Error("再試行するアイテムがありません");
+    }
+
+    const results = [];
+
+    for (const item of items) {
+      try {
+        // アイテムのeventDataを取得
+        const eventData = item.data || item.eventData;
+        if (!eventData) {
+          results.push({
+            success: false,
+            item,
+            error: new Error("イベントデータが見つかりません"),
+          });
+          continue;
+        }
+
+        // カレンダー追加を再試行
+        const result = await handleAddToCalendar(eventData);
+
+        if (result.success) {
+          results.push({ success: true, item });
+          logger?.debug("Retry successful for item", { index: item.index });
+        } else {
+          results.push({
+            success: false,
+            item,
+            error: new Error(result.error || "再試行に失敗しました"),
+          });
+          logger?.warn("Retry failed for item", {
+            index: item.index,
+            error: result.error,
+          });
+        }
+
+        // APIレート制限を考慮した間隔
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      } catch (error) {
+        results.push({ success: false, item, error });
+        logger?.error("Retry error for item", { index: item.index, error });
+      }
+    }
+
+    const successful = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+
+    logger?.info("Retry completed", {
+      total: items.length,
+      successful,
+      failed,
+    });
+
+    return {
+      success: true,
+      results,
+      summary: {
+        total: items.length,
+        successful,
+        failed,
+      },
+    };
+  } catch (error) {
+    const handled = errorHandler?.handleError(error, "失敗アイテム再試行");
+
+    logger?.error("Failed to retry items", error);
+
+    return {
+      success: false,
+      error:
+        handled?.userMessage?.message || "再試行処理でエラーが発生しました",
+    };
+  }
 }
