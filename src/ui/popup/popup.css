@@ -1,0 +1,162 @@
+body {
+  font-family: sans-serif;
+  width: 200px;
+  padding: 10px;
+}
+
+h1 {
+  font-size: 16px;
+  margin-top: 0;
+}
+
+/* エラー表示スタイル */
+.error-notification {
+  margin: 10px 0;
+  padding: 12px;
+  background: #fff2f0;
+  border: 1px solid #ffccd2;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.error-notification.hidden {
+  display: none;
+}
+
+.error-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.error-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.error-title {
+  flex: 1;
+  font-weight: 600;
+  color: #d73a49;
+}
+
+.error-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #586069;
+  padding: 0;
+  margin-left: 8px;
+}
+
+.error-close:hover {
+  color: #d73a49;
+}
+
+.error-message {
+  color: #24292e;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.error-details {
+  margin: 8px 0;
+}
+
+.error-details.hidden {
+  display: none;
+}
+
+.error-details-content {
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.error-details-content pre {
+  margin: 4px 0 0 0;
+  font-size: 11px;
+  color: #586069;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.error-action-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  background: #f6f8fa;
+  cursor: pointer;
+  color: #24292e;
+}
+
+.error-action-btn:hover {
+  background: #e1e4e8;
+}
+
+.error-action-btn.primary {
+  background: #0366d6;
+  color: white;
+  border-color: #0366d6;
+}
+
+.error-action-btn.primary:hover {
+  background: #0256cc;
+}
+
+.error-action-btn.hidden {
+  display: none;
+}
+
+/* 成功通知スタイル */
+.success-notification {
+  margin: 10px 0;
+  padding: 12px;
+  background: #f0fff4;
+  border: 1px solid #b8e6c1;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.success-notification.hidden {
+  display: none;
+}
+
+.success-header {
+  display: flex;
+  align-items: center;
+}
+
+.success-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.success-message {
+  flex: 1;
+  color: #22863a;
+  font-weight: 500;
+}
+
+.success-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #586069;
+  padding: 0;
+  margin-left: 8px;
+}
+
+.success-close:hover {
+  color: #22863a;
+}

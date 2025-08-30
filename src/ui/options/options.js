@@ -3,6 +3,10 @@
  * 設定の読み込み、保存、バリデーション、UI制御を担当
  */
 
+// グローバル変数
+let logger = null;
+let errorHandler = null;
+
 // 日付形式の表示名マッピング
 const DATE_FORMAT_LABELS = {
   JP: "日本語 (2024年1月15日)",
@@ -80,12 +84,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   console.log("ChronoClip: Options page loaded");
 
   try {
+    // logger/errorHandlerの初期化
+    await initializeLogging();
+
     // DOM要素の初期化を最初に行う
     initializeElements();
 
     // 設定ライブラリの初期化を待つ（タイムアウト付き）
     if (!window.ChronoClipSettings) {
-      console.log("ChronoClip: Waiting for settings library...");
+      logger?.info("Waiting for settings library...");
       await new Promise((resolve, reject) => {
         let attempts = 0;
         const maxAttempts = 100; // 5秒でタイムアウト
@@ -93,15 +100,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         const checkSettings = () => {
           attempts++;
           if (window.ChronoClipSettings) {
-            console.log(
-              "ChronoClip: Settings library loaded after",
-              attempts * 50,
-              "ms"
-            );
+            logger?.info("Settings library loaded successfully", {
+              attempts,
+              duration: attempts * 50 + "ms",
+            });
             resolve();
           } else if (attempts >= maxAttempts) {
-            console.error("ChronoClip: Settings library loading timed out");
-            reject(new Error("Settings library loading timed out"));
+            const error = new Error("Settings library loading timed out");
+            logger?.error("Settings library loading timed out", error);
+            reject(error);
           } else {
             setTimeout(checkSettings, 50);
           }
@@ -616,6 +623,9 @@ function initializeEventListeners() {
     openTestPageBtn.addEventListener("click", openTestPage);
   }
 
+  // デバッグ機能の初期化
+  initializeDebugFeatures();
+
   console.log("ChronoClip: Event listeners initialization complete");
 }
 
@@ -628,6 +638,14 @@ function updateUI() {
   elements.highlightDates.checked = currentSettings.highlightDates;
   elements.includeURL.checked = currentSettings.includeURL;
   elements.rulesEnabled.checked = currentSettings.rulesEnabled;
+
+  // デバッグ・監視設定
+  const debugModeCheckbox = document.getElementById("debugMode");
+  const errorReportCheckbox = document.getElementById("errorReportConsent");
+  if (debugModeCheckbox)
+    debugModeCheckbox.checked = currentSettings.debugMode || false;
+  if (errorReportCheckbox)
+    errorReportCheckbox.checked = currentSettings.errorReportConsent || false;
 
   // 数値入力
   elements.defaultDuration.value = currentSettings.defaultDuration;
@@ -1020,6 +1038,10 @@ async function handleSave(e) {
  * フォームから設定オブジェクトを取得
  */
 function getSettingsFromForm() {
+  // デバッグ設定のチェックボックスを取得
+  const debugModeCheckbox = document.getElementById("debugMode");
+  const errorReportCheckbox = document.getElementById("errorReportConsent");
+
   const settings = {
     ...currentSettings,
     autoDetect: elements.autoDetect.checked,
@@ -1029,6 +1051,11 @@ function getSettingsFromForm() {
     defaultCalendar: elements.defaultCalendar.value,
     timezone: elements.timezone.value,
     rulesEnabled: elements.rulesEnabled.checked,
+    // デバッグ・監視設定
+    debugMode: debugModeCheckbox ? debugModeCheckbox.checked : false,
+    errorReportConsent: errorReportCheckbox
+      ? errorReportCheckbox.checked
+      : false,
     // dateFormats と siteRules は既に currentSettings に反映済み
   };
 
@@ -1889,6 +1916,342 @@ function toggleCollapsibleSection(event) {
   const header = event.currentTarget;
   const section = header.closest(".collapsible");
   section.classList.toggle("collapsed");
+}
+
+/**
+ * logger/errorHandlerの初期化
+ */
+async function initializeLogging() {
+  try {
+    if (window.ChronoClipLogger) {
+      logger = new window.ChronoClipLogger();
+      console.log("ChronoClip: Options logger initialized");
+    }
+
+    if (window.ChronoClipErrorHandler) {
+      errorHandler = new window.ChronoClipErrorHandler();
+      logger?.info("Options error handler initialized");
+    }
+
+    if (!logger || !errorHandler) {
+      console.warn(
+        "ChronoClip: Logger or ErrorHandler not available in options"
+      );
+    }
+  } catch (error) {
+    console.error(
+      "ChronoClip: Failed to initialize logging in options:",
+      error
+    );
+  }
+}
+
+/**
+ * デバッグ機能の初期化
+ */
+function initializeDebugFeatures() {
+  // デバッグボタンのイベントリスナー
+  const clearLogsBtn = document.getElementById("clearLogsBtn");
+  const exportLogsBtn = document.getElementById("exportLogsBtn");
+  const testErrorHandlingBtn = document.getElementById("testErrorHandlingBtn");
+  const showSystemInfoBtn = document.getElementById("showSystemInfoBtn");
+
+  const refreshLogsBtn = document.getElementById("refreshLogsBtn");
+  const hideLogsBtn = document.getElementById("hideLogsBtn");
+  const hideSystemInfoBtn = document.getElementById("hideSystemInfoBtn");
+
+  const logLevelFilter = document.getElementById("logLevelFilter");
+
+  // ログクリア
+  clearLogsBtn?.addEventListener("click", () => {
+    try {
+      if (logger && typeof logger.clearLogs === "function") {
+        logger.clearLogs();
+        showToast("ログをクリアしました", "success");
+        refreshDebugLogs();
+      } else {
+        showToast("ログクリア機能が利用できません", "error");
+      }
+    } catch (error) {
+      logger?.error("Failed to clear logs", error);
+      showToast("ログクリアに失敗しました", "error");
+    }
+  });
+
+  // ログエクスポート
+  exportLogsBtn?.addEventListener("click", async () => {
+    try {
+      const logs = await getLogEntries();
+      const logData = {
+        timestamp: new Date().toISOString(),
+        entries: logs,
+        systemInfo: await getSystemInfo(),
+      };
+
+      const blob = new Blob([JSON.stringify(logData, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `chronoclip-logs-${new Date()
+        .toISOString()
+        .replace(/:/g, "-")}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast("ログを出力しました", "success");
+      logger?.info("Logs exported successfully");
+    } catch (error) {
+      logger?.error("Failed to export logs", error);
+      showToast("ログ出力に失敗しました", "error");
+    }
+  });
+
+  // エラーハンドリングテスト
+  testErrorHandlingBtn?.addEventListener("click", () => {
+    try {
+      const testErrors = [
+        { type: "Error", message: "テスト用エラーメッセージ" },
+        { type: "TypeError", message: "undefined is not a function" },
+        { type: "NetworkError", message: "Failed to fetch from API" },
+      ];
+
+      const randomError =
+        testErrors[Math.floor(Math.random() * testErrors.length)];
+      const error = new Error(randomError.message);
+      error.name = randomError.type;
+
+      if (errorHandler) {
+        const result = errorHandler.handleError(
+          error,
+          "エラーハンドリングテスト"
+        );
+        showToast("エラーハンドリングテストを実行しました", "info");
+        logger?.info("Error handling test executed", { result });
+      } else {
+        throw new Error("ErrorHandler not available");
+      }
+    } catch (error) {
+      logger?.error("Failed to test error handling", error);
+      showToast("エラーハンドリングテストに失敗しました", "error");
+    }
+  });
+
+  // システム情報表示
+  showSystemInfoBtn?.addEventListener("click", async () => {
+    try {
+      const systemInfo = await getSystemInfo();
+      displaySystemInfo(systemInfo);
+      showToast("システム情報を表示しました", "info");
+    } catch (error) {
+      logger?.error("Failed to show system info", error);
+      showToast("システム情報表示に失敗しました", "error");
+    }
+  });
+
+  // ログ更新
+  refreshLogsBtn?.addEventListener("click", () => {
+    refreshDebugLogs();
+    showToast("ログを更新しました", "info");
+  });
+
+  // ログ非表示
+  hideLogsBtn?.addEventListener("click", () => {
+    const container = document.getElementById("debugLogsContainer");
+    container?.classList.add("hidden");
+  });
+
+  // システム情報非表示
+  hideSystemInfoBtn?.addEventListener("click", () => {
+    const container = document.getElementById("systemInfoContainer");
+    container?.classList.add("hidden");
+  });
+
+  // ログレベルフィルター
+  logLevelFilter?.addEventListener("change", () => {
+    refreshDebugLogs();
+  });
+}
+
+/**
+ * デバッグログの更新
+ */
+async function refreshDebugLogs() {
+  try {
+    const logs = await getLogEntries();
+    const levelFilter =
+      document.getElementById("logLevelFilter")?.value || "all";
+    const filteredLogs =
+      levelFilter === "all"
+        ? logs
+        : logs.filter((log) => log.level === levelFilter);
+
+    const output = document.getElementById("debugLogsOutput");
+    if (output) {
+      output.innerHTML = "";
+
+      if (filteredLogs.length === 0) {
+        output.textContent = "ログエントリがありません";
+        return;
+      }
+
+      filteredLogs.slice(-100).forEach((entry) => {
+        const logDiv = document.createElement("div");
+        logDiv.className = `debug-log-entry ${entry.level}`;
+
+        const timestamp = new Date(entry.timestamp).toLocaleString();
+        logDiv.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> <span class="log-level">[${entry.level.toUpperCase()}]</span> ${
+          entry.message
+        }`;
+
+        if (entry.context) {
+          const contextSpan = document.createElement("span");
+          contextSpan.className = "log-context";
+          contextSpan.textContent = ` | ${JSON.stringify(entry.context)}`;
+          logDiv.appendChild(contextSpan);
+        }
+
+        output.appendChild(logDiv);
+      });
+
+      // 最新のログまでスクロール
+      output.scrollTop = output.scrollHeight;
+    }
+
+    // ログコンテナを表示
+    const container = document.getElementById("debugLogsContainer");
+    container?.classList.remove("hidden");
+  } catch (error) {
+    logger?.error("Failed to refresh debug logs", error);
+  }
+}
+
+/**
+ * ログエントリの取得
+ */
+async function getLogEntries() {
+  try {
+    // logger からログ履歴を取得
+    if (logger && typeof logger.getLogs === "function") {
+      return await logger.getLogs();
+    }
+
+    // フォールバック: Chrome storage から取得
+    const result = await chrome.storage.local.get(["chronoclip_logs"]);
+    return result.chronoclip_logs || [];
+  } catch (error) {
+    console.error("Failed to get log entries:", error);
+    return [];
+  }
+}
+
+/**
+ * システム情報の取得
+ */
+async function getSystemInfo() {
+  const manifest = chrome.runtime.getManifest();
+  const settings = currentSettings || {};
+
+  const systemInfo = {
+    extension: {
+      version: manifest.version,
+      manifestVersion: manifest.manifest_version,
+      name: manifest.name,
+    },
+    browser: {
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      platform: navigator.platform,
+      cookieEnabled: navigator.cookieEnabled,
+      onLine: navigator.onLine,
+    },
+    settings: {
+      autoDetect: settings.autoDetect,
+      highlightDates: settings.highlightDates,
+      debugMode: settings.debugMode,
+      errorReportConsent: settings.errorReportConsent,
+      timezone: settings.timezone,
+    },
+    storage: {
+      // ストレージ使用量情報
+    },
+    permissions: {
+      // 権限情報
+    },
+  };
+
+  try {
+    // ストレージ使用量を取得
+    const storageInfo = await chrome.storage.local.getBytesInUse();
+    systemInfo.storage.bytesInUse = storageInfo;
+  } catch (error) {
+    systemInfo.storage.error = error.message;
+  }
+
+  try {
+    // 権限情報を取得
+    const permissions = await chrome.permissions.getAll();
+    systemInfo.permissions = permissions;
+  } catch (error) {
+    systemInfo.permissions.error = error.message;
+  }
+
+  return systemInfo;
+}
+
+/**
+ * システム情報の表示
+ */
+function displaySystemInfo(systemInfo) {
+  const output = document.getElementById("systemInfoOutput");
+  if (!output) return;
+
+  output.innerHTML = "";
+
+  // セクション作成関数
+  function createSection(title, data) {
+    const section = document.createElement("div");
+    section.className = "system-info-section";
+
+    const header = document.createElement("h4");
+    header.textContent = title;
+    section.appendChild(header);
+
+    Object.entries(data).forEach(([key, value]) => {
+      const item = document.createElement("div");
+      item.className = "system-info-item";
+
+      const keySpan = document.createElement("span");
+      keySpan.className = "system-info-key";
+      keySpan.textContent = key;
+
+      const valueSpan = document.createElement("span");
+      valueSpan.className = "system-info-value";
+      valueSpan.textContent =
+        typeof value === "object" ? JSON.stringify(value) : String(value);
+
+      item.appendChild(keySpan);
+      item.appendChild(valueSpan);
+      section.appendChild(item);
+    });
+
+    return section;
+  }
+
+  // 各セクションを追加
+  output.appendChild(createSection("拡張機能情報", systemInfo.extension));
+  output.appendChild(createSection("ブラウザ情報", systemInfo.browser));
+  output.appendChild(createSection("設定情報", systemInfo.settings));
+  output.appendChild(createSection("ストレージ情報", systemInfo.storage));
+  output.appendChild(createSection("権限情報", systemInfo.permissions));
+
+  // システム情報コンテナを表示
+  const container = document.getElementById("systemInfoContainer");
+  container?.classList.remove("hidden");
 }
 
 // グローバル関数として公開（HTML内のonclick用）

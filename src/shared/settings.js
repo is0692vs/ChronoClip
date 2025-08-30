@@ -17,6 +17,10 @@ const DEFAULT_SETTINGS = {
   dateFormats: ["JP", "ISO", "US"], // 対応日付形式の優先順位
   rulesEnabled: false, // サイト別ルールの有効無効
   siteRules: {}, // サイト別ルール設定
+
+  // エラーハンドリングとログ関連設定（新規追加）
+  debugMode: false, // デバッグモード（詳細ログ表示）
+  errorReportConsent: false, // エラーレポート送信同意
 };
 
 /**

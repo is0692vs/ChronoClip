@@ -133,76 +133,100 @@
             </p>
           </div>
 
-          <div class="setting-item site-rules-hidden" id="siteRulesContainer">
-            <!-- 現在のタブ提案 -->
-            <div
-              class="current-tab-suggestion hidden"
-              id="currentTabSuggestion"
-            >
-              <p class="suggestion-text">
-                現在開いているタブ：<strong id="currentTabDomain"></strong>
-              </p>
-              <button
-                type="button"
-                id="addCurrentSiteBtn"
-                class="secondary-btn"
-              >
-                このサイトのルールを追加
-              </button>
-            </div>
+          <!-- 略：サイトルール関連のHTML -->
+        </section>
 
-            <!-- サイトルール一覧 -->
-            <div class="site-rules-header">
-              <label>設定済みサイトルール</label>
-              <input
-                type="text"
-                id="siteRuleSearch"
-                placeholder="ドメイン名で検索..."
-                class="search-input"
-              />
-            </div>
+        <!-- デバッグ・監視設定 -->
+        <section class="setting-section">
+          <h2>デバッグ・監視設定</h2>
 
-            <div class="site-rules-list" id="siteRulesList">
-              <div class="no-rules-message" id="noRulesMessage">
-                <p>まだサイトルールが設定されていません。</p>
-                <p>
-                  「新しいルールを追加」ボタンまたは現在のタブの提案からルールを作成してください。
-                </p>
-              </div>
-              <!-- JavaScriptで動的生成 -->
-            </div>
-
-            <div class="site-rules-actions">
-              <button type="button" id="addSiteRuleBtn" class="secondary-btn">
-                + 新しいルールを追加
-              </button>
-              <button
-                type="button"
-                id="exportSiteRulesBtn"
-                class="secondary-btn"
-              >
-                ルールをエクスポート
-              </button>
-              <input
-                type="file"
-                id="importSiteRulesInput"
-                accept=".json"
-                class="hidden"
-                title="インポートファイル選択"
-              />
-              <button
-                type="button"
-                id="importSiteRulesBtn"
-                class="secondary-btn"
-              >
-                ルールをインポート
-              </button>
-            </div>
-
+          <div class="setting-item">
+            <label for="debugMode">
+              <input type="checkbox" id="debugMode" name="debugMode" />
+              デバッグモードを有効にする
+            </label>
             <p class="description">
-              特定のサイトで使用するCSSセレクターや抽出ルールを設定できます。<br />
-              ドメインごとに日付の検出方法、タイトル・詳細の抽出方法をカスタマイズできます。
+              詳細なログ出力とデバッグ情報を表示します。開発者向け機能です。
             </p>
+          </div>
+
+          <div class="setting-item">
+            <label for="errorReportConsent">
+              <input
+                type="checkbox"
+                id="errorReportConsent"
+                name="errorReportConsent"
+              />
+              エラーレポート送信に同意する
+            </label>
+            <p class="description">
+              エラー発生時に匿名の障害レポートを送信して、拡張機能の改善に協力します。
+            </p>
+          </div>
+
+          <div class="setting-item debug-actions">
+            <label>デバッグアクション</label>
+            <div class="button-group debug-buttons">
+              <button type="button" id="clearLogsBtn" class="secondary-btn">
+                ログクリア
+              </button>
+              <button type="button" id="exportLogsBtn" class="secondary-btn">
+                ログエクスポート
+              </button>
+              <button
+                type="button"
+                id="testErrorHandlingBtn"
+                class="secondary-btn"
+              >
+                エラーハンドリングテスト
+              </button>
+              <button
+                type="button"
+                id="showSystemInfoBtn"
+                class="secondary-btn"
+              >
+                システム情報表示
+              </button>
+            </div>
+            <p class="description">
+              開発とトラブルシューティングのためのデバッグアクション
+            </p>
+          </div>
+
+          <!-- ログ表示エリア -->
+          <div class="setting-item debug-logs hidden" id="debugLogsContainer">
+            <label>最新のログ出力</label>
+            <div class="debug-log-controls">
+              <label for="logLevelFilter">ログレベル:</label>
+              <select
+                id="logLevelFilter"
+                class="select-input"
+                title="表示するログレベルを選択"
+              >
+                <option value="all">すべて</option>
+                <option value="debug">DEBUG</option>
+                <option value="info">INFO</option>
+                <option value="warn">WARN</option>
+                <option value="error">ERROR</option>
+                <option value="fatal">FATAL</option>
+              </select>
+              <button type="button" id="refreshLogsBtn" class="secondary-btn">
+                更新
+              </button>
+              <button type="button" id="hideLogsBtn" class="secondary-btn">
+                非表示
+              </button>
+            </div>
+            <div id="debugLogsOutput" class="debug-logs-output"></div>
+          </div>
+
+          <!-- システム情報表示エリア -->
+          <div class="setting-item system-info hidden" id="systemInfoContainer">
+            <label>システム情報</label>
+            <button type="button" id="hideSystemInfoBtn" class="secondary-btn">
+              非表示
+            </button>
+            <div id="systemInfoOutput" class="system-info-output"></div>
           </div>
         </section>
 
@@ -544,13 +568,15 @@
     </footer>
 
     <!-- スクリプト読み込み -->
-    <script src="../lib/settings.js"></script>
-    <script src="../lib/site-rule-manager.js"></script>
-    <script src="../lib/extractors/base-extractor.js"></script>
-    <script src="../lib/extractors/eventbrite-extractor.js"></script>
-    <script src="../lib/extractors/amazon-extractor.js"></script>
-    <script src="../lib/extractors/general-extractor.js"></script>
-    <script src="../lib/extractors/extractor-factory.js"></script>
+    <script src="../../shared/logger.js"></script>
+    <script src="../../shared/error-handler.js"></script>
+    <script src="../../shared/settings.js"></script>
+    <script src="../../shared/site-rule-manager.js"></script>
+    <script src="../../shared/extractors/base-extractor.js"></script>
+    <script src="../../shared/extractors/eventbrite-extractor.js"></script>
+    <script src="../../shared/extractors/amazon-extractor.js"></script>
+    <script src="../../shared/extractors/general-extractor.js"></script>
+    <script src="../../shared/extractors/extractor-factory.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

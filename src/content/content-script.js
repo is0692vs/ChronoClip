@@ -32,26 +32,62 @@ const ignoreSelectors = [
   let currentSettings = null;
   let isInitialized = false;
 
+  // --- Logger/ErrorHandler 初期化 ---
+  let logger = null;
+  let errorHandler = null;
+
+  // Logger/ErrorHandler の初期化（遅延初期化）
+  function initializeLogging() {
+    if (!logger && window.ChronoClipLogger) {
+      try {
+        logger = new window.ChronoClipLogger();
+        // 一時的にデバッグモードを有効化
+        logger.setDebugMode(true);
+        console.log("ChronoClip: Logger initialized");
+      } catch (error) {
+        console.error("ChronoClip: Failed to initialize logger:", error);
+      }
+    }
+
+    if (!errorHandler && window.ChronoClipErrorHandler) {
+      try {
+        errorHandler = new window.ChronoClipErrorHandler();
+        console.log("ChronoClip: Error handler initialized");
+      } catch (error) {
+        console.error("ChronoClip: Failed to initialize error handler:", error);
+      }
+    }
+  }
   /**
    * 設定を初期化・購読
    */
   async function initializeSettings() {
+    // Logger/ErrorHandler を先に初期化
+    initializeLogging();
+
     try {
+      logger?.info("Initializing content script settings");
       currentSettings = await window.ChronoClipSettings.getSettings();
-      console.log(
-        "ChronoClip: Settings loaded in content script:",
-        currentSettings
-      );
+      logger?.info("Settings loaded in content script", {
+        autoDetect: currentSettings?.autoDetect,
+        highlightDates: currentSettings?.highlightDates,
+      });
 
       // 設定変更リスナーを登録
       window.ChronoClipSettings.onSettingsChanged(handleSettingsChanged);
 
       return currentSettings;
     } catch (error) {
-      console.error(
-        "ChronoClip: Failed to load settings in content script:",
-        error
-      );
+      const handled = errorHandler?.handleError(error, {
+        type: "settings",
+        phase: "initialization",
+      });
+
+      logger?.error("Failed to load settings in content script", {
+        error: error.message,
+        userMessage: handled?.userMessage?.message,
+      });
+
       currentSettings = window.ChronoClipSettings.getDefaultSettings();
       return currentSettings;
     }
@@ -61,7 +97,10 @@ const ignoreSelectors = [
    * 設定変更時の処理
    */
   function handleSettingsChanged(newSettings) {
-    console.log("ChronoClip: Settings updated in content script:", newSettings);
+    logger?.info("Settings updated in content script", {
+      autoDetect: newSettings?.autoDetect,
+      highlightDates: newSettings?.highlightDates,
+    });
     const oldSettings = currentSettings;
     currentSettings = newSettings;
 
@@ -561,6 +600,17 @@ const ignoreSelectors = [
    * @param {MouseEvent} e - クリックイベントオブジェクト
    */
   async function showQuickAddPopup(normalizedDate, time, e) {
+    // Logger/ErrorHandler の初期化確認
+    if (!logger || !errorHandler) {
+      initializeLogging();
+    }
+
+    logger?.debug("Showing quick add popup", {
+      normalizedDate,
+      hasTime: !!time,
+      hasTarget: !!e?.target,
+    });
+
     // 既にポップアップが表示されている場合は非表示にする
     if (quickAddPopupHost) {
       hideQuickAddPopup();
@@ -578,13 +628,13 @@ const ignoreSelectors = [
             window.ChronoClipExtractorFactory.getExtractorFactory();
           const domain = window.location.hostname;
 
-          console.log("ChronoClip: Using ExtractorFactory for domain:", domain);
+          logger?.debug("Using ExtractorFactory for domain", { domain });
 
           // ExtractorFactoryで抽出を実行
           extractedEvent = extractorFactory.extract(e.target, domain);
         } else if (window.ChronoClipExtractor) {
           // フォールバック: 古い抽出エンジンを使用
-          console.log("ChronoClip: Falling back to legacy extractor");
+          logger?.debug("Falling back to legacy extractor");
 
           // オプション設定を取得
           const options = {
@@ -605,7 +655,9 @@ const ignoreSelectors = [
               }
             }
           } catch (error) {
-            console.warn("ChronoClip: Failed to load options, using defaults");
+            logger?.warn("Failed to load extraction options, using defaults", {
+              error: error.message,
+            });
           }
 
           extractedEvent = window.ChronoClipExtractor.extractEventContext(
@@ -616,31 +668,82 @@ const ignoreSelectors = [
         performanceMonitor.extractionCalls++;
         console.log("ChronoClip: Extracted event context:", extractedEvent);
 
+        logger?.debug("Event context extraction result", {
+          hasResult: !!extractedEvent,
+          isPromise:
+            extractedEvent && typeof extractedEvent.then === "function",
+          extractedEventType: typeof extractedEvent,
+          extractedEventConstructor: extractedEvent?.constructor?.name,
+        });
+
         // extractedEventがPromiseの場合は結果を待つ
         if (extractedEvent && typeof extractedEvent.then === "function") {
+          console.log("ChronoClip: Processing Promise result");
           shouldShowDefaultPopup = false; // デフォルトポップアップを無効化
 
           try {
+            logger?.debug("Awaiting promise resolution for extracted event");
             const result = await extractedEvent;
-            console.log("ChronoClip: Resolved extracted event:", result);
+            logger?.debug("Resolved extracted event", {
+              hasTitle: !!result?.title,
+              hasDate: !!result?.date,
+              hasEvents: !!result?.events,
+              fullResult: result,
+            });
+
             // 抽出結果があり、有効なデータがある場合はポップアップを表示
             if (result && (result.title || result.date || result.events)) {
-              console.log("ChronoClip: Showing popup with extracted data");
-              showQuickAddPopupWithData(result);
-              return; // 抽出結果ポップアップを表示したので終了
+              logger?.info("Showing popup with extracted data");
+              try {
+                await showQuickAddPopupWithData(result);
+                return; // 抽出結果ポップアップを表示したので終了
+              } catch (popupError) {
+                logger?.warn(
+                  "Error in showQuickAddPopupWithData, falling back to default",
+                  {
+                    error: popupError.message,
+                    stack: popupError.stack,
+                    extractedData: {
+                      title: result.title,
+                      hasDate: !!result.date,
+                      hasEvents: !!result.events,
+                      hasLocation: !!result.location,
+                      url: result.url,
+                    },
+                  }
+                );
+                console.error(
+                  "ChronoClip: showQuickAddPopupWithData error details:",
+                  popupError
+                );
+                // ポップアップ表示でエラーが発生した場合はデフォルトポップアップへ
+                shouldShowDefaultPopup = true;
+              }
             } else {
               // 抽出結果が無効な場合はデフォルトポップアップを表示
-              console.log(
-                "ChronoClip: No valid extracted data, showing default popup"
-              );
+              logger?.info("No valid extracted data, showing default popup", {
+                result: result,
+                hasTitle: !!result?.title,
+                hasDate: !!result?.date,
+                hasEvents: !!result?.events,
+              });
               shouldShowDefaultPopup = true;
             }
           } catch (error) {
-            console.error(
-              "ChronoClip: Error resolving extracted event:",
-              error
+            const handled = errorHandler?.handleError(error, {
+              type: "extraction",
+              phase: "promise_resolution",
+            });
+
+            logger?.warn(
+              "Error resolving extracted event, falling back to default popup",
+              {
+                error: error.message,
+                userMessage: handled?.userMessage?.message,
+              }
             );
-            // エラーの場合もデフォルトポップアップを表示
+
+            // エラーの場合もデフォルトポップアップを表示（処理を継続）
             shouldShowDefaultPopup = true;
           }
         } else if (
@@ -648,13 +751,42 @@ const ignoreSelectors = [
           (extractedEvent.title || extractedEvent.date || extractedEvent.events)
         ) {
           // 同期的な結果の場合
-          console.log("ChronoClip: Showing popup with extracted data (sync)");
-          showQuickAddPopupWithData(extractedEvent);
-          return; // ポップアップが表示された場合は通常のポップアップは表示しない
+          console.log("ChronoClip: Processing sync result", extractedEvent);
+          logger?.info("Showing popup with extracted data (sync)");
+          try {
+            await showQuickAddPopupWithData(extractedEvent);
+            return; // ポップアップが表示された場合は通常のポップアップは表示しない
+          } catch (popupError) {
+            logger?.warn(
+              "Error in showQuickAddPopupWithData (sync), falling back to default",
+              {
+                error: popupError.message,
+                extractedData: extractedEvent,
+              }
+            );
+            // ポップアップ表示でエラーが発生した場合はデフォルトポップアップを継続
+            shouldShowDefaultPopup = true;
+          }
+        } else {
+          // extractedEventが存在するが有効でない場合
+          console.log("ChronoClip: extractedEvent exists but invalid", {
+            extractedEvent,
+            hasTitle: !!extractedEvent?.title,
+            hasDate: !!extractedEvent?.date,
+            hasEvents: !!extractedEvent?.events,
+          });
         }
       }
     } catch (error) {
-      console.error("ChronoClip: Error extracting event context:", error);
+      const handled = errorHandler?.handleError(error, {
+        type: "extraction",
+        phase: "event_context_extraction",
+      });
+
+      logger?.warn("Error extracting event context", {
+        error: error.message,
+        userMessage: handled?.userMessage?.message,
+      });
     }
 
     // デフォルトポップアップを表示するかチェック
@@ -691,8 +823,8 @@ const ignoreSelectors = [
       }
 
       // HTMLとCSSをフェッチ
-      const htmlUrl = chrome.runtime.getURL("quick-add-popup.html");
-      const cssUrl = chrome.runtime.getURL("quick-add-popup.css");
+      const htmlUrl = chrome.runtime.getURL("src/ui/quick-add-popup.html");
+      const cssUrl = chrome.runtime.getURL("src/ui/quick-add-popup.css");
 
       const [htmlResponse, cssResponse] = await Promise.all([
         fetch(htmlUrl),
@@ -1166,6 +1298,9 @@ const ignoreSelectors = [
   // メイン初期化関数
   async function initialize() {
     try {
+      // ロギングシステムの確実な初期化
+      initializeLogging();
+
       await initializeSettings();
       isInitialized = true;
 
@@ -1179,13 +1314,23 @@ const ignoreSelectors = [
         }
       }
 
-      console.log(
-        "ChronoClip: Content script initialized. autoDetect =",
-        currentSettings.autoDetect
-      );
+      logger?.info("Content script initialized", {
+        autoDetect: currentSettings.autoDetect,
+        highlightDates: currentSettings.highlightDates,
+      });
     } catch (error) {
-      console.error("ChronoClip: Failed to initialize content script:", error);
-      isInitialized = true; // エラーでも初期化済みとする
+      const handled = errorHandler?.handleError(error, {
+        type: "initialization",
+        phase: "content_script_startup",
+      });
+
+      logger?.error("Failed to initialize content script", {
+        error: error.message,
+        userMessage: handled?.userMessage?.message,
+      });
+
+      // エラーでも基本的な初期化は完了とする
+      isInitialized = true;
     }
   }
 
@@ -1331,9 +1476,30 @@ const ignoreSelectors = [
 })();
 
 /**
+ * グローバルloggerとerrorHandlerを取得するユーティリティ関数
+ */
+function getLoggerAndErrorHandler() {
+  const logger =
+    window.chronoClipLogger ||
+    (window.ChronoClipLogger ? new window.ChronoClipLogger() : null);
+  const errorHandler =
+    window.chronoClipErrorHandler ||
+    (window.ChronoClipErrorHandler
+      ? new window.ChronoClipErrorHandler()
+      : null);
+
+  // デバッグモードを有効化
+  if (logger && logger.setDebugMode) {
+    logger.setDebugMode(true);
+  }
+
+  return { logger, errorHandler };
+}
+
+/**
  * サービスワーカーからのメッセージをリッスンします。
  */
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   // エラー以外のメッセージは基本的にログ出力しない
   if (
     message.type !== "show_toast" &&
@@ -1360,7 +1526,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.payload && message.payload.extractedData) {
         const data = message.payload.extractedData;
         // 抽出されたデータを使ってポップアップを表示
-        showQuickAddPopupWithData(data);
+        await showQuickAddPopupWithData(data);
       }
       break;
 
@@ -1407,13 +1573,22 @@ function showToast(type, message) {
  * Issue #11: 選択範囲から抽出されたデータを使ってポップアップを表示
  * @param {object} extractedData - 抽出されたデータ
  */
-function showQuickAddPopupWithData(extractedData) {
-  console.log(
-    "ChronoClip: Showing quick add popup with extracted data:",
-    extractedData
-  );
+async function showQuickAddPopupWithData(extractedData) {
+  // loggerとerrorHandlerをグローバルから取得
+  const { logger, errorHandler } = getLoggerAndErrorHandler();
+
+  logger?.info("Showing quick add popup with extracted data", {
+    hasTitle: !!extractedData?.title,
+    hasEvents: !!extractedData?.events?.length,
+    hasDate: !!extractedData?.date || !!extractedData?.dateTime,
+  });
+
+  logger?.debug("showQuickAddPopupWithData - step 1: function entry");
 
   try {
+    logger?.debug(
+      "showQuickAddPopupWithData - step 2: checking existing popup"
+    );
     // 既存のポップアップが表示されている場合は削除
     const existingPopup = document.querySelector(".chronoclip-quick-add-popup");
     if (existingPopup) {
@@ -1421,6 +1596,7 @@ function showQuickAddPopupWithData(extractedData) {
       existingPopup.remove();
     }
 
+    logger?.debug("showQuickAddPopupWithData - step 3: calculating position");
     // ポップアップの位置を画面上部寄りに設定
     const rect = {
       left: window.innerWidth / 2 - 200, // 幅400pxとして中央配置
@@ -1431,6 +1607,7 @@ function showQuickAddPopupWithData(extractedData) {
 
     console.log("ChronoClip: Popup position calculated:", rect);
 
+    logger?.debug("showQuickAddPopupWithData - step 4: preparing date info");
     // 抽出されたデータから日付情報を準備
     let dateInfo = null;
 
@@ -1587,27 +1764,59 @@ function showQuickAddPopupWithData(extractedData) {
       },
     });
 
-    showQuickAddPopupForExtractedData(
-      dateInfo,
-      {
+    logger?.debug(
+      "showQuickAddPopupWithData - step 5: calling showQuickAddPopupForExtractedData"
+    );
+    try {
+      await showQuickAddPopupForExtractedData(
+        dateInfo,
+        {
+          title: title,
+          description: description,
+          url: eventSpecificUrl,
+          source: extractedData.source,
+        },
+        {
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+        }
+      );
+      logger?.debug(
+        "showQuickAddPopupWithData - step 6: showQuickAddPopupForExtractedData completed successfully"
+      );
+    } catch (extractedDataError) {
+      logger?.error("Error in showQuickAddPopupForExtractedData call", {
+        error: extractedDataError.message,
+        stack: extractedDataError.stack,
+        dateInfo: dateInfo,
         title: title,
         description: description,
         url: eventSpecificUrl,
-        source: extractedData.source,
-      },
-      {
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-      }
-    );
+      });
+      console.error(
+        "ChronoClip: showQuickAddPopupForExtractedData error:",
+        extractedDataError
+      );
+      throw extractedDataError; // 再throw してshowQuickAddPopupWithDataのcatchブロックに渡す
+    }
 
-    console.log("ChronoClip: Quick add popup displayed for selection data");
+    logger?.info("Quick add popup displayed for extracted data");
   } catch (error) {
-    console.error(
-      "ChronoClip: Error showing popup with extracted data:",
-      error
+    const handled = errorHandler?.handleError(error, {
+      type: "ui",
+      phase: "popup_display",
+    });
+
+    logger?.error("Error showing popup with extracted data", {
+      error: error.message,
+      userMessage: handled?.userMessage?.message,
+    });
+
+    showToast(
+      "error",
+      handled?.userMessage?.message ||
+        "ポップアップの表示でエラーが発生しました"
     );
-    showToast("error", "ポップアップの表示でエラーが発生しました");
   }
 }
 
@@ -1622,13 +1831,16 @@ async function showQuickAddPopupForExtractedData(
   eventData,
   position
 ) {
-  try {
-    console.log("ChronoClip: Showing popup for extracted data", {
-      dateInfo,
-      eventData,
-      position,
-    });
+  // loggerとerrorHandlerをグローバルから取得
+  const { logger, errorHandler } = getLoggerAndErrorHandler();
 
+  logger?.debug("Showing popup for extracted data", {
+    hasDateInfo: !!dateInfo,
+    hasEventData: !!eventData,
+    hasPosition: !!position,
+  });
+
+  try {
     // ポップアップが既に存在する場合は削除
     const existingPopup = document.getElementById("chronoclip-popup-host");
     if (existingPopup) {
@@ -1659,8 +1871,8 @@ async function showQuickAddPopupForExtractedData(
     }
 
     // HTMLとCSSをフェッチ
-    const htmlUrl = chrome.runtime.getURL("quick-add-popup.html");
-    const cssUrl = chrome.runtime.getURL("quick-add-popup.css");
+    const htmlUrl = chrome.runtime.getURL("src/ui/quick-add-popup.html");
+    const cssUrl = chrome.runtime.getURL("src/ui/quick-add-popup.css");
 
     const [htmlResponse, cssResponse] = await Promise.all([
       fetch(htmlUrl),
@@ -2010,41 +2222,156 @@ async function showQuickAddPopupForExtractedData(
 
           // Googleカレンダーに追加
           console.log("ChronoClip: Sending event to background:", eventPayload);
-          chrome.runtime.sendMessage(
-            {
-              type: "calendar:createEvent",
-              payload: eventPayload,
-            },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                console.error(
-                  "ChronoClip: Error sending message:",
-                  chrome.runtime.lastError.message
-                );
-                showToast(
-                  "error",
-                  `イベント追加に失敗しました: ${chrome.runtime.lastError.message}`
-                );
-                return;
-              }
+          console.log("ChronoClip: About to call chrome.runtime.sendMessage");
 
-              console.log("ChronoClip: Received response:", response);
+          // Service Workerが応答するかテスト
+          const testServiceWorker = () => {
+            return new Promise((resolve, reject) => {
+              console.log("ChronoClip: Testing service worker connectivity");
 
-              if (response && response.ok) {
-                showToast(
-                  "success",
-                  `イベント「${eventPayload.summary}」をカレンダーに追加しました。`
+              let timeoutId;
+              let completed = false;
+
+              // 5秒のタイムアウトを設定
+              timeoutId = setTimeout(() => {
+                if (!completed) {
+                  completed = true;
+                  console.error("ChronoClip: Service worker ping timeout");
+                  reject(new Error("Service worker ping timeout"));
+                }
+              }, 5000);
+
+              chrome.runtime.sendMessage({ type: "ping" }, (response) => {
+                if (!completed) {
+                  completed = true;
+                  clearTimeout(timeoutId);
+
+                  if (chrome.runtime.lastError) {
+                    console.error(
+                      "ChronoClip: Service worker ping failed:",
+                      chrome.runtime.lastError
+                    );
+                    reject(chrome.runtime.lastError);
+                  } else {
+                    console.log(
+                      "ChronoClip: Service worker ping success:",
+                      response
+                    );
+                    resolve(response);
+                  }
+                }
+              });
+            });
+          };
+
+          // まずService Workerをテスト
+          testServiceWorker()
+            .then(() => {
+              console.log(
+                "ChronoClip: Service worker is responsive, sending event"
+              );
+
+              const messageData = {
+                type: "calendar:createEvent",
+                payload: eventPayload,
+              };
+
+              console.log("ChronoClip: Message data:", messageData);
+
+              chrome.runtime.sendMessage(messageData, (response) => {
+                console.log("ChronoClip: Message callback called");
+                console.log(
+                  "ChronoClip: chrome.runtime.lastError:",
+                  chrome.runtime.lastError
                 );
-              } else {
-                const errorMessage = response?.message || "不明なエラー";
-                console.error("ChronoClip: Calendar API error:", errorMessage);
-                showToast(
-                  "error",
-                  `イベントの追加に失敗しました: ${errorMessage}`
+
+                if (chrome.runtime.lastError) {
+                  console.error(
+                    "ChronoClip: Runtime error:",
+                    chrome.runtime.lastError.message
+                  );
+                  showToast(
+                    "error",
+                    `イベント追加に失敗しました: ${chrome.runtime.lastError.message}`
+                  );
+                  return;
+                }
+
+                console.log("ChronoClip: Received response:", response);
+                console.log("ChronoClip: Response type:", typeof response);
+                console.log("ChronoClip: Response.success:", response?.success);
+
+                if (response && response.success) {
+                  showToast(
+                    "success",
+                    `イベント「${eventPayload.summary}」をカレンダーに追加しました。`
+                  );
+                } else {
+                  const errorMessage = response?.error || "不明なエラー";
+                  console.error(
+                    "ChronoClip: Calendar API error:",
+                    errorMessage
+                  );
+                  showToast(
+                    "error",
+                    `イベントの追加に失敗しました: ${errorMessage}`
+                  );
+                }
+              });
+            })
+            .catch((error) => {
+              console.error(
+                "ChronoClip: Service worker test failed, trying direct send:",
+                error
+              );
+
+              // Service Workerテストが失敗した場合でも、直接送信を試行
+              const messageData = {
+                type: "calendar:createEvent",
+                payload: eventPayload,
+              };
+
+              chrome.runtime.sendMessage(messageData, (response) => {
+                console.log("ChronoClip: Message callback called (fallback)");
+                console.log(
+                  "ChronoClip: chrome.runtime.lastError:",
+                  chrome.runtime.lastError
                 );
-              }
-            }
-          );
+
+                if (chrome.runtime.lastError) {
+                  console.error(
+                    "ChronoClip: Runtime error:",
+                    chrome.runtime.lastError.message
+                  );
+                  showToast(
+                    "error",
+                    `イベント追加に失敗しました: ${chrome.runtime.lastError.message}`
+                  );
+                  return;
+                }
+
+                console.log("ChronoClip: Received response:", response);
+                console.log("ChronoClip: Response type:", typeof response);
+                console.log("ChronoClip: Response.success:", response?.success);
+
+                if (response && response.success) {
+                  showToast(
+                    "success",
+                    `イベント「${eventPayload.summary}」をカレンダーに追加しました。`
+                  );
+                } else {
+                  const errorMessage = response?.error || "不明なエラー";
+                  console.error(
+                    "ChronoClip: Calendar API error:",
+                    errorMessage
+                  );
+                  showToast(
+                    "error",
+                    `イベントの追加に失敗しました: ${errorMessage}`
+                  );
+                }
+              });
+            });
 
           popupHost.remove();
         } catch (error) {
@@ -2053,13 +2380,23 @@ async function showQuickAddPopupForExtractedData(
         }
       });
     }
-    console.log("ChronoClip: Quick add popup displayed for extracted data");
+    logger?.info("Quick add popup displayed for extracted data");
   } catch (error) {
-    console.error(
-      "ChronoClip: Error in showQuickAddPopupForExtractedData:",
-      error
+    const handled = errorHandler?.handleError(error, {
+      type: "ui",
+      phase: "popup_display_extracted",
+    });
+
+    logger?.error("Error in showQuickAddPopupForExtractedData", {
+      error: error.message,
+      userMessage: handled?.userMessage?.message,
+    });
+
+    showToast(
+      "error",
+      handled?.userMessage?.message ||
+        "ポップアップの表示でエラーが発生しました"
     );
-    showToast("error", "ポップアップの表示でエラーが発生しました");
   }
 }
 
@@ -2077,3 +2414,269 @@ function formatDate(date) {
 
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * ページ内の全ての日付を一括でカレンダーに追加
+ */
+async function addAllDatesToCalendar() {
+  try {
+    logger?.info("Starting batch add to calendar");
+
+    // 現在ハイライトされている全ての日付要素を取得
+    const highlightedElements = document.querySelectorAll(".chronoclip-date");
+
+    if (highlightedElements.length === 0) {
+      showToast("info", "追加可能な日付が見つかりません");
+      return;
+    }
+
+    logger?.info("Found highlighted dates", {
+      count: highlightedElements.length,
+    });
+
+    // 各日付要素から情報を抽出
+    const dateItems = [];
+    for (const element of highlightedElements) {
+      try {
+        const extractedData = await extractEventDataFromElement(element);
+        if (extractedData && extractedData.date) {
+          dateItems.push({
+            element,
+            data: extractedData,
+            index: dateItems.length,
+          });
+        }
+      } catch (error) {
+        logger?.warn("Failed to extract data from element", { error, element });
+      }
+    }
+
+    if (dateItems.length === 0) {
+      showToast("warn", "有効な日付情報を抽出できませんでした");
+      return;
+    }
+
+    logger?.info("Extracted valid date items", { count: dateItems.length });
+
+    // 一括処理を実行
+    const results = [];
+    let successCount = 0;
+    let failedItems = [];
+
+    for (const item of dateItems) {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: "add_to_calendar",
+          eventData: item.data,
+        });
+
+        if (response && response.success) {
+          results.push({ success: true, item });
+          successCount++;
+          logger?.debug("Item added successfully", { index: item.index });
+        } else {
+          const error = new Error(response?.error || "追加に失敗しました");
+          results.push({ success: false, item, error });
+          failedItems.push(item);
+          logger?.warn("Item add failed", {
+            index: item.index,
+            error: response?.error,
+          });
+        }
+      } catch (error) {
+        results.push({ success: false, item, error });
+        failedItems.push(item);
+        logger?.error("Item add error", { index: item.index, error });
+      }
+
+      // 短い間隔でリクエストを送信（APIレート制限を考慮）
+      if (item.index < dateItems.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    // 結果をerrorHandlerで処理
+    const batchResult = errorHandler?.handleBatchResult(results) || {
+      message: `${successCount}件中${successCount}件が完了しました`,
+      successful: successCount,
+      failed: failedItems.length,
+      total: dateItems.length,
+    };
+
+    // 結果を表示
+    showBatchResultToast(batchResult, failedItems);
+
+    logger?.info("Batch add completed", batchResult);
+  } catch (error) {
+    const handled = errorHandler?.handleError(error, "一括追加") || {
+      userMessage: { message: "一括追加中にエラーが発生しました" },
+    };
+
+    logger?.error("Batch add failed", error);
+    showToast("error", handled.userMessage.message);
+  }
+}
+
+/**
+ * 要素から詳細なイベントデータを抽出
+ * @param {HTMLElement} element - 日付要素
+ * @returns {Object} 抽出されたイベントデータ
+ */
+async function extractEventDataFromElement(element) {
+  try {
+    // 基本的な日付抽出
+    const dateText = element.textContent.trim();
+    const parsedDate = parseDateText(dateText);
+
+    if (!parsedDate) {
+      throw new Error("日付の解析に失敗しました");
+    }
+
+    // extractorを使用してより詳細な情報を抽出
+    let extractedData = null;
+    if (window.ExtractorFactory) {
+      try {
+        const extractor = window.ExtractorFactory.createExtractor(
+          window.location.href
+        );
+        if (extractor) {
+          extractedData = await extractor.extractEvents(element);
+          if (extractedData && extractedData.length > 0) {
+            // 最初の結果を使用
+            extractedData = extractedData[0];
+          }
+        }
+      } catch (extractorError) {
+        logger?.debug(
+          "Extractor failed, using basic extraction",
+          extractorError
+        );
+      }
+    }
+
+    // 基本的なデータ構造を作成
+    return {
+      date: formatDate(parsedDate),
+      title: extractedData?.title || generateEventTitle(element),
+      description:
+        extractedData?.description || generateEventDescription(element),
+      location: extractedData?.location || "",
+      startTime: extractedData?.startTime || null,
+      endTime: extractedData?.endTime || null,
+      source: window.location.href,
+      rawText: dateText,
+      elementHtml: element.outerHTML.substring(0, 200), // デバッグ用
+    };
+  } catch (error) {
+    logger?.error("Failed to extract event data from element", {
+      error,
+      element,
+    });
+    throw error;
+  }
+}
+
+/**
+ * 要素周辺からイベントタイトルを生成
+ * @param {HTMLElement} element - 日付要素
+ * @returns {string} 生成されたタイトル
+ */
+function generateEventTitle(element) {
+  try {
+    // 見出し要素を探す
+    const headings =
+      element
+        .closest("article, section, div")
+        ?.querySelectorAll("h1, h2, h3, h4, h5, h6") || [];
+    for (const heading of headings) {
+      const text = heading.textContent.trim();
+      if (text && text.length > 3 && text.length < 100) {
+        return text;
+      }
+    }
+
+    // タイトル候補となる要素を探す
+    const titleSelectors = [".title", ".headline", ".event-title", ".name"];
+    for (const selector of titleSelectors) {
+      const titleEl = element
+        .closest("article, section, div")
+        ?.querySelector(selector);
+      if (titleEl) {
+        const text = titleEl.textContent.trim();
+        if (text && text.length > 3 && text.length < 100) {
+          return text;
+        }
+      }
+    }
+
+    // フォールバック: ページタイトル
+    return document.title || "ウェブページのイベント";
+  } catch (error) {
+    logger?.debug("Failed to generate event title", error);
+    return "ウェブページのイベント";
+  }
+}
+
+/**
+ * 要素周辺からイベント詳細を生成
+ * @param {HTMLElement} element - 日付要素
+ * @returns {string} 生成された詳細
+ */
+function generateEventDescription(element) {
+  try {
+    const container = element.closest("article, section, div, p");
+    if (!container) return "";
+
+    // 説明文候補を探す
+    const descSelectors = ["p", ".description", ".content", ".detail"];
+    for (const selector of descSelectors) {
+      const descEl = container.querySelector(selector);
+      if (descEl && descEl !== element) {
+        const text = descEl.textContent.trim();
+        if (text && text.length > 10 && text.length < 500) {
+          return text;
+        }
+      }
+    }
+
+    // コンテナのテキストを使用（日付部分を除く）
+    const containerText = container.textContent.trim();
+    const dateText = element.textContent.trim();
+    const description = containerText.replace(dateText, "").trim();
+
+    if (description && description.length > 10 && description.length < 500) {
+      return description;
+    }
+
+    return "";
+  } catch (error) {
+    logger?.debug("Failed to generate event description", error);
+    return "";
+  }
+}
+
+/**
+ * 一括処理結果をトーストで表示
+ * @param {Object} batchResult - handleBatchResultの結果
+ * @param {Array} failedItems - 失敗したアイテム
+ */
+function showBatchResultToast(batchResult, failedItems = []) {
+  const { total, successful, failed, message } = batchResult;
+
+  if (failed === 0) {
+    // 全成功
+    showToast("success", `${successful}件のイベントを追加しました`);
+  } else if (successful === 0) {
+    // 全失敗
+    showToast("error", message);
+  } else {
+    // 部分成功
+    showToast("success", `${successful}件のイベントを追加しました`);
+    setTimeout(() => {
+      showToast("warn", `${failed}件のイベント追加に失敗しました`);
+    }, 2000);
+  }
+}
+
+// 一括処理機能をグローバル関数として公開
+window.addAllDatesToCalendar = addAllDatesToCalendar;
