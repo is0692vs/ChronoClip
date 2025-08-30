@@ -2,452 +2,103 @@
 
 > ウェブ上のあらゆる日付情報を、あなたのカレンダーへシームレスに
 
-## 📋 概要
+ChronoClip は、ウェブサイト上の日付やイベント情報を自動的に検出し、Google カレンダーに簡単に追加できる Chrome 拡張機能です。イベント情報の手動入力の手間を省き、スケジュール管理を効率化します。
 
-ChronoClip は、ウェブサイト上の日付情報を自動的に検出し、Google カレンダーに簡単に追加できる Chrome 拡張機能です。イベント情報の手動転記の手間を省き、日常のスケジュール管理をより効率的にします。
+## 🚀 主な機能
 
-## 🔍 主な機能
+- **日付の自動検出**: ページ上の日付をハイライトし、クリック一つでカレンダーに追加できます。
+- **イベント情報の自動抽出**: 日付周辺のテキストから、イベントのタイトルや詳細情報を自動でフォームに入力します。
+- **手動選択**: テキストを選択して右クリックするだけで、特定の情報を抜き出してカレンダーに登録できます。
+- **サイト固有ルール**: 特定のウェブサイト（例: Eventbrite, Amazon）に最適化された情報抽出ルールを適用できます。
+- **高いカスタマイズ性**: 開発者はサイト固有の抽出ルールやカスタム抽出器を簡単に追加できます。
 
-### 1. 自動検出機能
+## 📥 インストール手順
 
-- ページ内の日付を自動的に検出してハイライト表示
-- 検出した日付にカーソルを合わせると視覚的インジケーターを表示
-- クリックで即座にカレンダー登録用ポップアップを表示
+### 方法 1: Chrome ウェブストアから（準備中）
 
-### 2. イベント情報自動抽出機能
+現在 Chrome ウェブストアに申請中です。公開され次第、リンクを掲載します。
 
-- 日付クリック時に周辺コンテキストからイベント情報を自動抽出
-- 見出し、強調テキスト、親要素からタイトルを推定
-- 近接する段落や説明文から詳細情報を取得
-- 不要なナビゲーションやフッター情報をフィルタリング
-- 自動入力されたフォームで手軽にカレンダー追加
+### 方法 2: 手動インストール
 
-### 3. 手動選択機能 ✨ **NEW!**
+1.  リリースページ（準備中）から最新版の `ChronoClip.zip` をダウンロードします。
+2.  ダウンロードしたファイルを解凍します。
+3.  Chrome で `chrome://extensions` を開きます。
+4.  右上の「デベロッパー モード」をオンにします。
+5.  「パッケージ化されていない拡張機能を読み込む」ボタンをクリックし、解凍したフォルダを選択します。
 
-- テキストを選択して右クリックメニューから「Add to Calendar」でカレンダーに追加
-- 日付・時刻・タイトル・詳細を個別に自動抽出
-- 抽出に失敗した場合でも手動で編集可能
-- 「2025 年 09 月 13 日 (土) 17:30 開場」のような複雑な日付時刻形式にも対応
+## 使い方
 
-### 4. サイト固有検出機能 ✨ **NEW!**
+### 1. 自動検出
 
-- EventBrite、Amazon、楽天などの主要サイトに対応した専用抽出パターン
-- サイトごとに最適化されたセレクターと抽出戦略
-- 設定ファイルによる簡単なカスタマイズとパターン追加
-- 一般的なサイト用のフォールバックパターンも提供
+ウェブページを読み込むと、ChronoClip が自動的に日付を検出し、ハイライト表示します。ハイライトされた日付をクリックすると、カレンダー追加用のポップアップが開きます。
 
-### 5. 統合検出エンジン ✨ **NEW!**
+### 2. 手動選択
 
-- 選択右クリックと常時ハイライトで共通利用可能な抽出ロジック
-- モジュール化されたアーキテクチャで拡張・カスタマイズが容易
-- 複数の検出戦略を優先度順で自動適用
-- 抽出結果の信頼度スコア計算
+カレンダーに追加したい情報（日付、イベント名など）を含むテキストを選択し、右クリックメニューから「Add to Calendar」を選択します。
 
-### 6. サイト別カスタムルール機能 ✨ **NEW!**
+## 🛠️ 開発者向け情報
 
-- サイトごとに専用の抽出ルールを設定可能
-- タイトル・詳細・無視要素の CSS セレクターを個別指定
-- サブドメイン継承でドメイン設定を柔軟に適用
-- 設定画面から GUI で簡単にルール管理
-- バリデーション機能でセレクターの正確性を保証
-- 即時反映で設定変更がリアルタイムに適用
+### 開発環境のセットアップ
 
-### 7. カスタム抽出器開発機能 ✨ **NEW!**
+1.  **リポジトリをクローン**
 
-- JavaScript で独自のサイト専用抽出器を作成可能
-- 後楽園ホール専用抽出器やサンプル抽出器を参考に開発
-- タイトル・URL・日時・All Day 判定・詳細情報を自由に定義
-- モジュール化されたアーキテクチャで簡単統合
+    ```bash
+    git clone https://github.com/your-username/ChronoClip.git
+    cd ChronoClip
+    ```
 
-### 7. 高度な日付解析
+2.  **`manifest.json` の設定**
 
-- chrono-node ライブラリによる自然言語日付解析
-- 正規表現フォールバックによる幅広い日付形式サポート
-- 和暦、英語、相対表現（明日、来週など）に対応
-- 時刻情報の自動抽出と終了時刻の推定
+    - `manifest.example.json` をコピーして `manifest.json` を作成します。
+    - Google Cloud Console で OAuth 2.0 クライアント ID を作成し、`manifest.json` 内の `"YOUR_GOOGLE_CLOUD_OAUTH_CLIENT_ID.apps.googleusercontent.com"` を置き換えます。
+    - 拡張機能のキーを `"YOUR_GENERATED_EXTENSION_KEY"` に設定します。
 
-## 💡 ユースケース
+3.  **拡張機能の読み込み**
+    - Chrome で `chrome://extensions` を開き、「デベロッパー モード」をオンにします。
+    - 「パッケージ化されていない拡張機能を読み込む」をクリックし、このプロジェクトのルートフォルダを選択します。
 
-### イベント予定の管理
+### プロジェクト構成
 
-コンサートやフェスティバルの公式サイトで「9 月 15 日(土) 17:30 開場 年末特別公演 @武道館」という情報を見つけたら、選択して右クリックするだけで、日付・時刻・タイトルが自動入力されたカレンダー追加フォームが表示されます。
-
-### 予約や締め切り日の記録
-
-「申込期限は 2025 年 10 月 31 日までとなります」という文章を選択して右クリックするだけで、重要な締め切りを見逃さないようにカレンダーに登録できます。
-
-### 学術会議や講演会のスケジュール管理
-
-大学や研究機関のウェブサイトで複数の講演日程を個別に選択し、学術イベントのスケジュールを効率的に管理できます。
-
-### 旅行計画の整理
-
-観光地の営業カレンダーやイベント情報を閲覧しながら、旅行先でのアクティビティをカレンダーに直接登録できます。
-
-## 🎯 特徴
-
-- **汎用性**: 特定のサイトに依存せず、様々なウェブサイトで動作
-- **柔軟性**: 自動検出と手動選択のハイブリッド方式で幅広い状況に対応
-- **簡便性**: 複雑な設定不要、インストール後すぐに使用可能
-- **編集可能性**: 自動抽出に失敗した場合でも手動で修正可能
-- **高精度抽出**: chrono-node + 独自ロジックによる高精度な日付時刻抽出
-
-## 📊 想定ユーザー
-
-- イベント参加が多い人（音楽ファン、スポーツ観戦者など）
-- 仕事で多くのウェブイベントをチェックする必要がある人
-- スケジュール管理を効率化したい人
-- 複数のウェブサイトから情報を収集する研究者や学生
-
-## 🚀 期待される効果
-
-1. **時間短縮**: 手動転記の手間を大幅削減（1 イベント 30 秒 → 3 秒）
-2. **入力ミス防止**: 日付の転記ミスをなくす
-3. **情報の一元管理**: 様々なサイトの情報を統一的にカレンダー管理
-4. **見逃し防止**: 興味あるイベントを確実にカレンダー登録
-
-## 🔧 対応する日付形式
-
-````
-## 🔧 対応する日付形式
-
-```text
-// 対応する日付形式の例
-- 2025年8月27日 18:00
-- 2025/08/27 18:00
-- 2025-08-27T18:00
-- 8月27日（水）18時30分
-- 8/27（水）6:30pm
-- 令和7年8月27日
-- Aug 27, 2025 6pm
-- 27th August 2025
 ```
-
-## 🔜 開発ロードマップ
-
-1. ✅ 基本構造のセットアップ - 拡張機能の基本フレームワーク構築
-2. ✅ 日付検出機能 - 様々な形式の日付を検出する機能
-3. ✅ UI 実装 - 使いやすいインターフェースの構築
-4. ✅ Google Calendar 連携 - カレンダーへの追加機能
-5. ✅ コンテキスト抽出 - イベント詳細の自動抽出（Issue #10）
-6. ✅ 手動選択機能 - 右クリックメニューからの選択範囲追加（Issue #11）
-7. ✅ 統合モジュール化 - 拡張性とカスタマイズ性の向上
-8. 🔄 高度な機能 - 一括追加、サイト別設定など
-
-## 🛠 技術仕様
-
-### アーキテクチャ
-
-- **Manifest v3**: 最新の Chrome 拡張仕様に準拠
-- **Shadow DOM**: UI の分離とスタイル競合回避
-- **chrono-node**: 自然言語日付解析ライブラリ
-- **OAuth 2.0**: Google Calendar API 認証
-- **モジュラー設計**: 検出エンジンと抽出APIの統合アーキテクチャ
-
-### ファイル構成
-
-```text
 ChronoClip/
-├── manifest.json                     # 拡張機能設定
-├── manifest.example.json            # 設定例（機密情報除外版）
-├── background/
-│   └── service-worker.js            # バックグラウンド処理
-├── content/
-│   ├── content-script.js            # メインコンテンツスクリプト
-│   ├── content.css                  # コンテンツスタイル
-│   └── extractor.js                 # イベント情報抽出ロジック
-├── lib/
-│   ├── chrono.min.js               # 日付解析ライブラリ
-│   ├── date-utils.js               # 日付ユーティリティ
-│   ├── regex-patterns.js           # 正規表現パターン
-│   ├── calendar.js                 # カレンダー処理
-│   ├── settings.js                 # 設定管理
-│   ├── site-rule-manager.js        # サイトルール管理
-│   └── extractors/                 # カスタム抽出器
-│       ├── base-extractor.js       # 基底抽出器クラス
-│       ├── general-extractor.js    # 汎用抽出器
-│       ├── tokyo-dome-hall-extractor.js  # 後楽園ホール専用抽出器
-│       ├── example-extractor.js    # サンプル抽出器（開発用）
-│       └── extractor-factory.js    # 抽出器ファクトリー
-├── options/
-│   ├── options.html                # 設定画面
-│   └── options.js                  # 設定画面ロジック
-├── popup/
-│   ├── popup.html                  # ポップアップUI
-│   ├── popup.js                    # ポップアップロジック
-│   └── popup.css                   # ポップアップスタイル
-├── quick-add-popup.html            # クイック追加ポップアップUI
-├── quick-add-popup.css             # クイック追加ポップアップスタイル
-├── icons/                          # アイコンファイル
-└── tests/                          # テストファイル
-    ├── date-detection.test.js      # 日付検出テスト
-        └── *.html                      # テスト用HTMLファイル
+├── config/
+│   ├── constants.js              # 各種設定値
+│   └── site-patterns.js          # サイト固有の抽出パターン
+├── manifest.json                 # 拡張機能のマニフェスト
+├── src/
+│   ├── background/
+│   │   └── service-worker.js     # バックグラウンド処理
+│   ├── content/                  # Webページに挿入されるスクリプト
+│   │   ├── content-script.js
+│   │   ├── event-detector.js
+│   │   └── ...
+│   ├── shared/                   # 共有モジュール
+│   │   ├── calendar.js
+│   │   ├── date-parser.js
+│   │   └── extractors/           # サイト別抽出ロジック
+│   └── ui/                       # UI関連ファイル
+│       ├── options/              # 設定ページ
+│       └── popup/                # ポップアップ
+├── tests/                        # テストファイル
+│   ├── *.html                    # 各機能のテストページ
+│   └── README.md                 # テストの実行方法
+└── README.md
 ```
 
-## 🎯 カスタム抽出器の開発
+### テストの実行
 
-ChronoClip では、特定のサイト向けに専用の抽出器を作成できます。
+このプロジェクトのテストは、ブラウザで HTML ファイルを開くことで実行します。
 
-### 抽出器の作成手順
+1.  **単体テスト**: `tests` ディレクトリにある `date-parsing-test.html` や `event-extraction-test.html` などをブラウザで直接開きます。
+2.  **統合テスト**: 一部のテスト（例: `settings-integration-test.html`）は、拡張機能のコンテキストで実行する必要があります。
+    - 拡張機能を読み込んだ後、`chrome-extension://<拡張機能ID>/tests/settings-integration-test.html` のような URL にアクセスします。
+    - 詳細は `tests/README.md` を参照してください。
 
-1. **ベースファイルの作成**
+### カスタム抽出器の開発
 
-   `lib/extractors/example-extractor.js` をコピーして、新しい抽出器ファイルを作成します。
+特定のサイト向けに専用の抽出器を `src/shared/extractors/` 内に作成できます。
 
-2. **基本設定の変更**
-
-```javascript
-constructor() {
-  this.domain = "yoursite.com";      // 対象ドメイン
-  this.name = "YourSiteExtractor";   // 抽出器名
-  this.version = "1.0.0";           // バージョン
-
-  // CSS セレクター定義
-  this.selectors = {
-    titleElement: ".event-title",    // タイトル要素
-    linkElement: ".event-title a",   // URL取得用リンク要素
-    dateElement: ".event-date",      // 日付要素
-    timeElement: ".event-time",      // 時間要素
-    // 必要に応じて追加
-  };
-}
-```
-
-3. **抽出ロジックの実装**
-
-```javascript
-async extract(context) {
-  try {
-    // タイトル抽出
-    const title = this.extractTitle(context);
-
-    // URL抽出（タイトルと同じ行のhref属性から）
-    const url = this.extractUrl(context);
-
-    // 日付・時間抽出
-    const dateTime = this.extractDateTime(context);
-
-    // All Day判定
-    const isAllDay = this.extractAllDay(context);
-
-    // 結果を返す
-    return {
-      title: title,
-      description: url || "",  // 詳細にはURLを設定
-      date: dateTime,
-      url: url,
-      confidence: 0.9,
-      extractor: this.name,
-      domain: this.domain,
-    };
-  } catch (error) {
-    // エラーハンドリング
-    return { /* エラー時の戻り値 */ };
-  }
-}
-```
-
-4. **抽出器の登録**
-
-   `lib/extractors/extractor-factory.js` に新しい抽出器を登録します。
-
-5. **manifest.json の更新**
-
-   新しい抽出器ファイルをスクリプトリストに追加します。
-
-### 抽出できる情報
-
-- **タイトル**: イベント名
-- **URL**: イベント詳細ページのURL（詳細フィールドに表示）
-- **日付・時間**: イベントの開始日時
-- **All Day**: 終日イベントかどうか
-- **場所**: イベント開催場所
-- **価格**: 料金情報
-
-### 参考実装
-
-後楽園ホール専用抽出器（`tokyo-dome-hall-extractor.js`）が完全な実装例として利用できます。
-
-## 🔧 対応する日付形式
-````
-
-## 🔜 開発ロードマップ
-
-1. ✅ 基本構造のセットアップ - 拡張機能の基本フレームワーク構築
-2. ✅ 日付検出機能 - 様々な形式の日付を検出する機能
-3. ✅ UI 実装 - 使いやすいインターフェースの構築
-4. ✅ Google Calendar 連携 - カレンダーへの追加機能
-5. ✅ コンテキスト抽出 - イベント詳細の自動抽出（Issue #10）
-6. ✅ 手動選択機能 - 右クリックメニューからの選択範囲追加（Issue #11）
-7. 🔄 高度な機能 - 一括追加、サイト別設定など
-
-## � 技術仕様
-
-### アーキテクチャ
-
-- **Manifest v3**: 最新の Chrome 拡張仕様に準拠
-- **Shadow DOM**: UI の分離とスタイル競合回避
-- **chrono-node**: 自然言語日付解析ライブラリ
-- **OAuth 2.0**: Google Calendar API 認証
-
-### ファイル構成
-
-```text
-ChronoClip/
-├── manifest.json                 # 拡張機能設定
-├── background/
-│   └── service-worker.js        # バックグラウンド処理
-├── content/
-│   ├── content-script.js        # メインコンテンツスクリプト
-│   ├── event-detector.js        # 統合イベント検出エンジン
-│   ├── extractor-api.js         # 統合抽出API
-│   ├── extractor.js            # 旧イベント情報抽出ロジック（互換性）
-│   └── selection.js            # 手動選択モード処理
-├── lib/
-│   ├── chrono.min.js           # 日付解析ライブラリ
-│   ├── date-parser.js          # 日付解析wrapper
-│   ├── date-utils.js           # 日付ユーティリティ
-│   └── regex-patterns.js       # 正規表現パターン
-├── tests/
-│   ├── integrated-module-test.html  # 統合モジュールテスト
-│   └── date-parsing-test.html   # 日付解析テスト
-├── quick-add-popup.html         # ポップアップUI
-├── quick-add-popup.css          # ポップアップスタイル
-└── config/
-    └── constants.js            # 設定定数
-```
-
-## �📄 ライセンス
-
-このプロジェクトは MIT ライセンスの下で公開されています。
-
-## 👥 貢献
-
-バグ報告、機能リクエスト、プルリクエストなど、あらゆる形での貢献を歓迎します。
-
-## セットアップ
-
-## 開発環境のセットアップ
-
-1. Google Cloud Console であなた自身の OAuth 2.0 クライアント ID を作成してください。
-   - アプリケーションの種類は「Chrome アプリ」を選択し、アプリケーション ID には拡張機能の ID（開発中は`chrome://extensions`で確認できる ID）を入力してください。
-2. このリポジトリにある `manifest.example.json` ファイルをコピーし、`manifest.json` という名前に変更します。
-3. 新しく作成した `manifest.json` を開き、以下のプレースホルダーを置き換えてください。
-   - `"YOUR_GOOGLE_CLOUD_OAUTH_CLIENT_ID.apps.googleusercontent.com"` の部分を、ステップ 1 で取得したあなた自身のクライアント ID に置き換えます。
-   - `"YOUR_GENERATED_EXTENSION_KEY"` の部分を、拡張機能の ID を固定するためのキーに置き換えます。このキーは、一度拡張機能をロードして ID を確認し、その ID からキーを生成するツール（例: [https://www.extensionid.com/](https://www.extensionid.com/)）などを使って生成できます。
-4. Chrome 拡張機能の管理画面で、このフォルダを「パッケージ化されていない拡張機能」として読み込みます。
-
-## 設定とカスタマイズ
-
-### 設定ファイル
-
-ChronoClip では、`config/constants.js` ファイルで各種定数と設定を管理しています。これにより、アプリケーションの動作を簡単にカスタマイズできます。
-
-#### 主な設定項目
-
-##### イベント関連設定
-
-- `DEFAULT_DURATION_HOURS`: デフォルトのイベント継続時間（デフォルト: 3 時間）
-- `MIN_DURATION_MINUTES`: 最小イベント継続時間（デフォルト: 15 分）
-- `MAX_DURATION_HOURS`: 最大イベント継続時間（デフォルト: 24 時間）
-
-##### UI 関連設定
-
-- `POPUP_Z_INDEX`: ポップアップの z-index 値（デフォルト: 99999）
-- `POPUP_OFFSET`: ポップアップの表示オフセット（デフォルト: 10px）
-- `ANIMATION_DURATION`: アニメーションの持続時間（デフォルト: 200ms）
-
-##### パフォーマンス関連設定
-
-- `MUTATION_DEBOUNCE_MS`: MutationObserver のデバウンス時間（デフォルト: 500ms）
-
-### サイト固有パターンのカスタマイズ ✨ **NEW!**
-
-`config/site-patterns.js`ファイルでサイト固有の検出パターンをカスタマイズできます。
-
-#### カスタムサイトパターンの追加
-
-```javascript
-// カスタムパターンの追加例
-window.addCustomSitePattern("my-custom-site", {
-  domains: ["example.com", "subdomain.example.com"],
-  selectors: {
-    title: [".event-title", "h1.title"],
-    date: [".event-date", ".schedule"],
-    description: [".event-description", ".content"],
-    price: [".price", ".cost"],
-  },
-  dateFormats: ["YYYY年MM月DD日", "MM月DD日"],
-  priority: 15, // 優先度（高いほど先に適用）
-  extraction: {
-    dateStrategy: "site-specific",
-    titleStrategy: "site-specific",
-    descriptionStrategy: "general",
-  },
-});
-```
-
-#### 既存パターンの更新
-
-```javascript
-// 既存パターンの部分更新
-window.updateSitePattern("eventbrite", {
-  selectors: {
-    title: [".event-title", ".custom-title"], // セレクターを追加
-    // 他の設定は既存のまま保持
-  },
-  priority: 20, // 優先度のみ変更
-});
-```
-
-### 抽出戦略のカスタマイズ ✨ **NEW!**
-
-統合検出エンジンに独自の抽出戦略を追加できます。
-
-```javascript
-// カスタム抽出戦略の追加例
-window.ChronoClipExtractor.addCustomStrategy("my-strategy", {
-  extractDate: async (context) => {
-    // 独自の日付抽出ロジック
-    return dateInfo;
-  },
-  extractTitle: async (context) => {
-    // 独自のタイトル抽出ロジック
-    return title;
-  },
-  extractDescription: async (context) => {
-    // 独自の詳細抽出ロジック
-    return description;
-  },
-  priority: 12, // 既存戦略との優先度調整
-});
-```
-
-- `BATCH_SIZE`: バッチ処理のサイズ（デフォルト: 100）
-- `MAX_NODES`: 処理対象の最大ノード数（デフォルト: 1000）
-
-##### 抽出関連設定
-
-- `MAX_TITLE_LENGTH`: タイトル抽出の最大文字数（デフォルト: 100）
-- `MAX_DESCRIPTION_LENGTH`: 詳細抽出の最大文字数（デフォルト: 500）
-- `NEARBY_SEARCH_RADIUS`: 近傍検索の範囲（デフォルト: 200px）
-
-#### 設定の変更方法
-
-1. `config/constants.js` ファイルを開く
-2. `window.ChronoClipConfig` オブジェクト内の該当する値を変更
-3. 拡張機能をリロード
-
-例：デフォルトのイベント継続時間を 2 時間に変更する場合：
-
-```javascript
-EVENT: {
-  DEFAULT_DURATION_HOURS: 2,  // 3から2に変更
-  DEFAULT_DURATION_MS: 2 * 60 * 60 * 1000,  // 2時間のミリ秒
-  // その他の設定...
-}
-```
-
-```
-
-```
+1.  `example-extractor.js` を参考に新しい抽出器ファイルを作成します。
+2.  ドメイン、セレクター、抽出ロジックを実装します。
+3.  `src/shared/extractors/extractor-factory.js` に新しい抽出器を登録します。
+4.  詳細は既存の抽出器（例: `stardom-detail-extractor.js`）を参照してください。
