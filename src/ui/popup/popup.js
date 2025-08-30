@@ -94,13 +94,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         errorToggleDetailsBtn.style.display = "none";
       }
-
-      if (errorResult.details) {
-        errorDetailsText.textContent = JSON.stringify(errorResult.details, null, 2);
-        errorToggleDetailsBtn.style.display = "block";
-      } else {
-        errorToggleDetailsBtn.style.display = "none";
-      }
+      // 再試行ボタンの表示制御
+      if (retryAction) {
+        errorRetryBtn.classList.remove("hidden");
       } else {
         errorRetryBtn.classList.add("hidden");
       }
