@@ -7,10 +7,13 @@ gha-creds-*.json
 # (ローカルでの開発にのみ使用し、公開しない)
 manifest.json
 
+tests/
+
 # その他、一般的な除外ファイル
 node_modules/
 dist/
 .DS_Store
 .vscode/
+
 
 .github/copilot-instructions.md
