@@ -79,9 +79,6 @@ ChronoClip/
 │   └── ui/                       # UI関連ファイル
 │       ├── options/              # 設定ページ
 │       └── popup/                # ポップアップ
-├── tests/                        # テストファイル
-│   ├── *.html                    # 各機能のテストページ
-│   └── README.md                 # テストの実行方法
 └── README.md
 ```
 
