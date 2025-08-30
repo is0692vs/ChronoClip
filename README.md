@@ -18,13 +18,15 @@ ChronoClip は、ウェブサイト上の日付やイベント情報を自動的
 
 現在 Chrome ウェブストアに申請中です。公開され次第、リンクを掲載します。
 
-### 方法 2: 手動インストール
+### 方法 2: 手動インストール（開発者向け）
 
-1.  リリースページ（準備中）から最新版の `ChronoClip.zip` をダウンロードします。
-2.  ダウンロードしたファイルを解凍します。
-3.  Chrome で `chrome://extensions` を開きます。
-4.  右上の「デベロッパー モード」をオンにします。
-5.  「パッケージ化されていない拡張機能を読み込む」ボタンをクリックし、解凍したフォルダを選択します。
+1.  このリポジトリをダウンロードまたはクローンします。
+2.  `manifest.example.json` をコピーして `manifest.json` を作成します。
+3.  Google Cloud Console で OAuth 2.0 クライアント ID を作成し、`manifest.json` 内の `"YOUR_GOOGLE_CLOUD_OAUTH_CLIENT_ID.apps.googleusercontent.com"` をご自身のクライアント ID に置き換えます。
+    - _（注: `manifest.json` の `key` は、拡張機能を一度読み込むと自動的に生成されるため、手動での設定は不要です。）_
+4.  Chrome で `chrome://extensions` を開きます。
+5.  右上の「デベロッパー モード」をオンにします。
+6.  「パッケージ化されていない拡張機能を読み込む」ボタンをクリックし、このプロジェクトのルートフォルダを選択します。
 
 ## 使い方
 
@@ -47,15 +49,24 @@ ChronoClip は、ウェブサイト上の日付やイベント情報を自動的
     cd ChronoClip
     ```
 
-2.  **`manifest.json` の設定**
+2.  **拡張機能の読み込み**
+    - 上記の「手動インストール」セクションの手順に従って、拡張機能を読み込みます。
+    - ソースコードを変更した場合は、`chrome://extensions` ページで拡張機能のリロードボタンをクリックしてください。
 
-    - `manifest.example.json` をコピーして `manifest.json` を作成します。
-    - Google Cloud Console で OAuth 2.0 クライアント ID を作成し、`manifest.json` 内の `"YOUR_GOOGLE_CLOUD_OAUTH_CLIENT_ID.apps.googleusercontent.com"` を置き換えます。
-    - 拡張機能のキーを `"YOUR_GENERATED_EXTENSION_KEY"` に設定します。
+### 拡張機能のパッケージングと ID の固定
 
-3.  **拡張機能の読み込み**
-    - Chrome で `chrome://extensions` を開き、「デベロッパー モード」をオンにします。
-    - 「パッケージ化されていない拡張機能を読み込む」をクリックし、このプロジェクトのルートフォルダを選択します。
+開発した拡張機能を配布可能な `.crx` ファイルとしてパッケージ化したり、開発中に拡張機能の ID を固定したり（Google OAuth の設定で必要）するには、以下の手順を実行します。
+
+1.  Chrome で `chrome://extensions` を開きます。
+2.  「デベロッパー モード」がオンになっていることを確認します。
+3.  「拡張機能をパッケージ化」ボタンをクリックします。
+4.  「拡張機能のルート ディレクトリ」に、このプロジェクトのルートフォルダ（`ChronoClip`フォルダ）を指定します。
+5.  **秘密鍵ファイル (.pem) の指定:**
+    - **初回パッケージ時:** この欄は空のままにします。「拡張機能をパッケージ化」をクリックすると、`.crx`ファイルと一緒に新しい`.pem`ファイル（秘密鍵）が生成されます。
+    - **2 回目以降（ID を固定する場合）:** 初回に生成された`.pem`ファイルを指定します。これにより、拡張機能の ID が同じものに固定されます。
+6.  「拡張機能をパッケージ化」をクリックすると、プロジェクトの親ディレクトリに `ChronoClip.crx` と（初回の場合は）`ChronoClip.pem` が生成されます。
+
+**重要:** 生成された `.pem` ファイルは、拡張機能の ID を保証する重要な秘密鍵です。紛失しないように安全な場所に保管し、絶対に公開したり、Git などのバージョン管理に含めたりしないでください。
 
 ### プロジェクト構成
 
@@ -82,20 +93,117 @@ ChronoClip/
 └── README.md
 ```
 
-### テストの実行
+### サイト固有ルール（カスタム抽出器）の追加手順
 
-このプロジェクトのテストは、ブラウザで HTML ファイルを開くことで実行します。
+特定のウェブサイト向けに、より高精度な情報抽出ルール（カスタム抽出器）を追加できます。以下の手順に従って開発してください。
 
-1.  **単体テスト**: `tests` ディレクトリにある `date-parsing-test.html` や `event-extraction-test.html` などをブラウザで直接開きます。
-2.  **統合テスト**: 一部のテスト（例: `settings-integration-test.html`）は、拡張機能のコンテキストで実行する必要があります。
-    - 拡張機能を読み込んだ後、`chrome-extension://<拡張機能ID>/tests/settings-integration-test.html` のような URL にアクセスします。
-    - 詳細は `tests/README.md` を参照してください。
+#### 1. 新しい抽出器（Extractor）ファイルを作成する
 
-### カスタム抽出器の開発
+まず、サイト固有の抽出ロジックを記述するファイルを作成します。
 
-特定のサイト向けに専用の抽出器を `src/shared/extractors/` 内に作成できます。
+1.  `src/shared/extractors/example-extractor.js` をコピーし、`src/shared/extractors/` ディレクトリ内に `{サイト名}-extractor.js` という名前で新しいファイルを作成します。（例: `my-site-extractor.js`）
+2.  ファイル内のクラス名を、`ChronoClip{サイト名}Extractor` のように、サイトに合わせて変更します。（例: `ChronoClipMySiteExtractor`）
+3.  `BaseExtractor` を継承するようにクラス定義を変更します。これにより、基本的な抽出機能やヘルパーメソッドを利用できます。
 
-1.  `example-extractor.js` を参考に新しい抽出器ファイルを作成します。
-2.  ドメイン、セレクター、抽出ロジックを実装します。
-3.  `src/shared/extractors/extractor-factory.js` に新しい抽出器を登録します。
-4.  詳細は既存の抽出器（例: `stardom-detail-extractor.js`）を参照してください。
+    ```javascript
+    // 変更前
+    class ChronoClipMySiteExtractor {
+        // ...
+    }
+
+    // 変更後
+    class ChronoClipMySiteExtractor extends window.ChronoClipBaseExtractor {
+        constructor(rule) {
+            super(rule); // 親クラスのコンストラクタを呼び出す
+            this.name = 'MySiteExtractor';
+            this.version = '1.0.0';
+        }
+        // ...
+    }
+    ```
+
+4.  `extractAll` メソッドをオーバーライド（再定義）し、サイトのHTML構造に合わせて、タイトル、日付、詳細情報などを抽出する具体的なロジックを実装します。多くの場合、`context.querySelector()` や `context.querySelectorAll()` を使って特定のCSSセレクタを持つ要素から情報を取得します。
+
+    ```javascript
+    async extractAll(context) {
+        // 親のextractAllを呼び出して基本的な情報を取得
+        const baseData = await super.extractAll(context);
+
+        // このサイト固有のロジックで情報を上書き・追加
+        const titleElement = context.querySelector('h1.event-title');
+        if (titleElement) {
+            baseData.title = this.cleanText(titleElement.textContent);
+        }
+
+        // 抽出の信頼度を更新
+        baseData.confidence = this.calculateConfidence(Object.values(baseData));
+
+        return baseData;
+    }
+    ```
+
+#### 2. URLパターンと抽出器を紐付ける
+
+次に、どのURLで新しい抽出器を有効にするかを設定します。
+
+1.  `config/site-patterns.js` ファイルを開きます。
+2.  `window.ChronoClipSitePatterns` オブジェクトの末尾に、新しいサイトの設定を追加します。`extractorModule` には、次のステップでFactoryに登録する際の一意なキー（通常はサイト名）を指定します。
+
+    ```javascript
+    window.ChronoClipSitePatterns = {
+      // ... 既存のルール
+      'my-site': { // サイトの一意なキー
+        domains: ['www.my-site.com', 'event.my-site.com'], // 対象ドメイン
+        priority: 10, // 優先度（高いほど優先される）
+        extractorModule: 'my-site', // 抽出器のキー
+        selectors: { // BaseExtractorが使用するセレクタ
+          title: 'h1.event-title, .main-title',
+          date: '.date-info, .schedule',
+          // ... その他必要なセレクタ
+        }
+      },
+      // ... generalルールは最後に
+    };
+    ```
+
+#### 3. 抽出器をFactoryに登録する
+
+作成した抽出器を、アプリケーションが認識できるように登録します。
+
+1.  `src/shared/extractors/extractor-factory.js` を開きます。
+2.  `registerExtractors` メソッド内に、新しい抽出器を登録するコードを追加します。キーは `site-patterns.js` で指定したものと一致させます。
+
+    ```javascript
+    registerExtractors() {
+      // ... 既存のExtractor
+      this.extractors.set('my-site', window.ChronoClipMySiteExtractor);
+      // ...
+    }
+    ```
+
+#### 4. `manifest.json` を更新する
+
+最後に、作成した抽出器のJavaScriptファイルをChrome拡張機能に読み込ませるための設定を行います。
+
+1.  `manifest.json` （または `manifest.example.json`）を開きます。
+2.  `web_accessible_resources` セクションの `resources` 配列に、作成した抽出器ファイルへのパスを追加します。これにより、ウェブページからスクリプトにアクセスできるようになります。
+
+    ```json
+    "web_accessible_resources": [
+      {
+        "resources": [
+          // ...
+          "src/shared/extractors/my-site-extractor.js"
+        ],
+        "matches": ["<all_urls>"]
+      }
+    ]
+    ```
+
+#### 5. 動作確認
+
+1.  Chromeで `chrome://extensions` を開きます。
+2.  ChronoClip拡張機能の「リロード」ボタンをクリックして、変更を反映させます。
+3.  設定した対象サイトのページを開き、日付などが正しくハイライトされたり、ポップアップに情報が自動入力されたりすることを確認します。
+
+もし問題が発生した場合は、デベロッパーコンソール（`F12`キー）で `ChronoClip:` から始まるログメッセージを確認すると、デバッグの助けになります。
