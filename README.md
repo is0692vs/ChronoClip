@@ -1,6 +1,8 @@
 # ChronoClip
 
-> ウェブ上のあらゆる日付情報を、あなたのカレンダーへシームレスに
+> Chrome + Chrono(時間) + Clip(切り取る)
+
+![GitHub last commit](https://img.shields.io/github/last-commit/is0692vs/ChronoClip) ![GitHub issues](https://img.shields.io/github/issues/is0692vs/ChronoClip) ![GitHub pull requests](https://img.shields.io/github/issues-pr/is0692vs/ChronoClip)
 
 ChronoClip は、ウェブサイト上の日付やイベント情報を自動的に検出し、Google カレンダーに簡単に追加できる Chrome 拡張機能です。イベント情報の手動入力の手間を省き、スケジュール管理を効率化します。
 
@@ -108,21 +110,21 @@ ChronoClip/
     ```javascript
     // 変更前
     class ChronoClipMySiteExtractor {
-        // ...
+      // ...
     }
 
     // 変更後
     class ChronoClipMySiteExtractor extends window.ChronoClipBaseExtractor {
-        constructor(rule) {
-            super(rule); // 親クラスのコンストラクタを呼び出す
-            this.name = 'MySiteExtractor';
-            this.version = '1.0.0';
-        }
-        // ...
+      constructor(rule) {
+        super(rule); // 親クラスのコンストラクタを呼び出す
+        this.name = "MySiteExtractor";
+        this.version = "1.0.0";
+      }
+      // ...
     }
     ```
 
-4.  `extractAll` メソッドをオーバーライド（再定義）し、サイトのHTML構造に合わせて、タイトル、日付、詳細情報などを抽出する具体的なロジックを実装します。多くの場合、`context.querySelector()` や `context.querySelectorAll()` を使って特定のCSSセレクタを持つ要素から情報を取得します。
+4.  `extractAll` メソッドをオーバーライド（再定義）し、サイトの HTML 構造に合わせて、タイトル、日付、詳細情報などを抽出する具体的なロジックを実装します。多くの場合、`context.querySelector()` や `context.querySelectorAll()` を使って特定の CSS セレクタを持つ要素から情報を取得します。
 
     ```javascript
     async extractAll(context) {
@@ -142,31 +144,33 @@ ChronoClip/
     }
     ```
 
-#### 2. URLパターンと抽出器を紐付ける
+#### 2. URL パターンと抽出器を紐付ける
 
-次に、どのURLで新しい抽出器を有効にするかを設定します。
+次に、どの URL で新しい抽出器を有効にするかを設定します。
 
 1.  `config/site-patterns.js` ファイルを開きます。
-2.  `window.ChronoClipSitePatterns` オブジェクトの末尾に、新しいサイトの設定を追加します。`extractorModule` には、次のステップでFactoryに登録する際の一意なキー（通常はサイト名）を指定します。
+2.  `window.ChronoClipSitePatterns` オブジェクトの末尾に、新しいサイトの設定を追加します。`extractorModule` には、次のステップで Factory に登録する際の一意なキー（通常はサイト名）を指定します。
 
     ```javascript
     window.ChronoClipSitePatterns = {
       // ... 既存のルール
-      'my-site': { // サイトの一意なキー
-        domains: ['www.my-site.com', 'event.my-site.com'], // 対象ドメイン
+      "my-site": {
+        // サイトの一意なキー
+        domains: ["www.my-site.com", "event.my-site.com"], // 対象ドメイン
         priority: 10, // 優先度（高いほど優先される）
-        extractorModule: 'my-site', // 抽出器のキー
-        selectors: { // BaseExtractorが使用するセレクタ
-          title: 'h1.event-title, .main-title',
-          date: '.date-info, .schedule',
+        extractorModule: "my-site", // 抽出器のキー
+        selectors: {
+          // BaseExtractorが使用するセレクタ
+          title: "h1.event-title, .main-title",
+          date: ".date-info, .schedule",
           // ... その他必要なセレクタ
-        }
+        },
       },
       // ... generalルールは最後に
     };
     ```
 
-#### 3. 抽出器をFactoryに登録する
+#### 3. 抽出器を Factory に登録する
 
 作成した抽出器を、アプリケーションが認識できるように登録します。
 
@@ -183,7 +187,7 @@ ChronoClip/
 
 #### 4. `manifest.json` を更新する
 
-最後に、作成した抽出器のJavaScriptファイルをChrome拡張機能に読み込ませるための設定を行います。
+最後に、作成した抽出器の JavaScript ファイルを Chrome 拡張機能に読み込ませるための設定を行います。
 
 1.  `manifest.json` （または `manifest.example.json`）を開きます。
 2.  `web_accessible_resources` セクションの `resources` 配列に、作成した抽出器ファイルへのパスを追加します。これにより、ウェブページからスクリプトにアクセスできるようになります。
@@ -202,8 +206,8 @@ ChronoClip/
 
 #### 5. 動作確認
 
-1.  Chromeで `chrome://extensions` を開きます。
-2.  ChronoClip拡張機能の「リロード」ボタンをクリックして、変更を反映させます。
+1.  Chrome で `chrome://extensions` を開きます。
+2.  ChronoClip 拡張機能の「リロード」ボタンをクリックして、変更を反映させます。
 3.  設定した対象サイトのページを開き、日付などが正しくハイライトされたり、ポップアップに情報が自動入力されたりすることを確認します。
 
 もし問題が発生した場合は、デベロッパーコンソール（`F12`キー）で `ChronoClip:` から始まるログメッセージを確認すると、デバッグの助けになります。
