@@ -209,6 +209,7 @@ function initializeElements() {
       "highlightDates",
       "highlight dates checkbox"
     ),
+    highlightColor: getElementSafe("highlightColor", "highlight color input"),
     includeURL: getElementSafe("includeURL", "include URL checkbox"),
     defaultDuration: getElementSafe(
       "defaultDuration",
@@ -647,6 +648,9 @@ function updateUI() {
   if (errorReportCheckbox)
     errorReportCheckbox.checked = currentSettings.errorReportConsent || false;
 
+  // カラーピッカー
+  elements.highlightColor.value = currentSettings.highlightColor || "#ffeb3b";
+
   // 数値入力
   elements.defaultDuration.value = currentSettings.defaultDuration;
 
@@ -1046,6 +1050,7 @@ function getSettingsFromForm() {
     ...currentSettings,
     autoDetect: elements.autoDetect.checked,
     highlightDates: elements.highlightDates.checked,
+    highlightColor: elements.highlightColor.value,
     includeURL: elements.includeURL.checked,
     defaultDuration: parseInt(elements.defaultDuration.value, 10),
     defaultCalendar: elements.defaultCalendar.value,

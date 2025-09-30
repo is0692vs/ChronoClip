@@ -100,6 +100,7 @@ const ignoreSelectors = [
     logger?.info("Settings updated in content script", {
       autoDetect: newSettings?.autoDetect,
       highlightDates: newSettings?.highlightDates,
+      highlightColor: newSettings?.highlightColor,
     });
     const oldSettings = currentSettings;
     currentSettings = newSettings;
@@ -128,6 +129,64 @@ const ignoreSelectors = [
         setTimeout(() => findAndHighlightDates(), 100);
       }
     }
+
+    // highlightColor設定の変更
+    if (
+      oldSettings &&
+      oldSettings.highlightColor !== newSettings.highlightColor &&
+      newSettings.highlightDates
+    ) {
+      // 既存のハイライトに新しい色を適用
+      updateAllHighlightColors(newSettings.highlightColor);
+    }
+  }
+
+  /**
+   * ハイライトカラーを要素に適用
+   */
+  function applyHighlightColor(element, color) {
+    // 16進数カラーコードからRGBAを計算
+    const rgb = hexToRgb(color);
+    if (rgb) {
+      // 背景色（30%透明度）
+      element.style.setProperty('background-color', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`, 'important');
+      // ボーダー色（50%透明度）
+      element.style.setProperty('border-bottom-color', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`, 'important');
+      
+      // ホバー時の色をカスタムプロパティとして設定
+      element.style.setProperty('--hover-bg-color', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.6)`);
+      element.style.setProperty('--hover-border-color', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 1)`);
+    }
+  }
+
+  /**
+   * 16進数カラーコードをRGBに変換
+   */
+  function hexToRgb(hex) {
+    // #を削除
+    hex = hex.replace(/^#/, "");
+    
+    // 3桁の場合は6桁に展開
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    
+    const bigint = parseInt(hex, 16);
+    return {
+      r: (bigint >> 16) & 255,
+      g: (bigint >> 8) & 255,
+      b: bigint & 255,
+    };
+  }
+
+  /**
+   * すべてのハイライトの色を更新
+   */
+  function updateAllHighlightColors(color) {
+    const highlights = document.querySelectorAll(".chronoclip-date");
+    highlights.forEach((element) => {
+      applyHighlightColor(element, color);
+    });
   }
 
   /**
@@ -467,6 +526,9 @@ const ignoreSelectors = [
         dateSpan.style.backgroundColor = "transparent";
         dateSpan.style.border = "none";
         dateSpan.style.borderRadius = "0";
+      } else if (currentSettings.highlightColor) {
+        // カスタムハイライトカラーを適用
+        applyHighlightColor(dateSpan, currentSettings.highlightColor);
       }
 
       // データ属性を設定
