@@ -31,6 +31,11 @@ const ignoreSelectors = [
   // --- 設定管理 ---
   let currentSettings = null;
   let isInitialized = false;
+  
+  // --- パフォーマンス最適化: 設定キャッシュ ---
+  let effectiveSettingsCache = null;
+  let effectiveSettingsCacheTime = 0;
+  const EFFECTIVE_SETTINGS_CACHE_TTL = 5000; // 5秒間キャッシュ
 
   // --- Logger/ErrorHandler 初期化 ---
   let logger = null;
@@ -145,11 +150,43 @@ const ignoreSelectors = [
     });
   }
 
+  /**
+   * 有効な設定を取得（キャッシュ付き）
+   * @returns {Object|null} 有効な設定
+   */
+  function getCachedEffectiveSettings() {
+    const now = Date.now();
+    if (effectiveSettingsCache && (now - effectiveSettingsCacheTime) < EFFECTIVE_SETTINGS_CACHE_TTL) {
+      return effectiveSettingsCache;
+    }
+
+    try {
+      if (
+        window.ChronoClipSettings &&
+        typeof window.ChronoClipSettings.getEffectiveSettings === "function"
+      ) {
+        effectiveSettingsCache = window.ChronoClipSettings.getEffectiveSettings(
+          window.location.hostname
+        );
+        effectiveSettingsCacheTime = now;
+        return effectiveSettingsCache;
+      }
+    } catch (error) {
+      console.warn(
+        "ChronoClip: Error getting effective settings:",
+        error
+      );
+    }
+    return null;
+  }
+
   // --- パフォーマンス監視 ---
   const performanceMonitor = {
     startTime: performance.now(),
     processedNodes: 0,
     extractionCalls: 0,
+    lazyLoadedNodes: 0,
+    skippedNodes: 0,
 
     log() {
       const elapsedTime = performance.now() - this.startTime;
@@ -158,14 +195,102 @@ const ignoreSelectors = [
         console.log(
           `ChronoClip Performance: ${this.processedNodes} nodes processed, ${
             this.extractionCalls
-          } extractions in ${elapsedTime.toFixed(2)}ms`
+          } extractions, ${this.lazyLoadedNodes} lazy loaded, ${
+            this.skippedNodes
+          } skipped in ${elapsedTime.toFixed(2)}ms`
         );
         this.startTime = performance.now(); // リセット
         this.processedNodes = 0;
         this.extractionCalls = 0;
+        this.lazyLoadedNodes = 0;
+        this.skippedNodes = 0;
       }
     },
   };
+
+  // --- 遅延読み込みの管理 ---
+  const lazyLoadManager = {
+    observer: null,
+    pendingNodes: new Map(), // node -> callback のマッピング
+    
+    init() {
+      if (!('IntersectionObserver' in window)) {
+        console.warn('ChronoClip: IntersectionObserver not supported, lazy loading disabled');
+        return false;
+      }
+
+      const config = window.ChronoClipConfig?.PERFORMANCE || {};
+      const rootMargin = config.INTERSECTION_ROOT_MARGIN || '100px';
+      const threshold = config.INTERSECTION_THRESHOLD || 0.01;
+
+      this.observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const node = entry.target;
+            const callback = this.pendingNodes.get(node);
+            if (callback) {
+              callback();
+              this.pendingNodes.delete(node);
+              this.observer.unobserve(node);
+              performanceMonitor.lazyLoadedNodes++;
+            }
+          }
+        });
+      }, { rootMargin, threshold });
+
+      return true;
+    },
+
+    observe(element, callback) {
+      if (!this.observer) return false;
+      this.pendingNodes.set(element, callback);
+      this.observer.observe(element);
+      return true;
+    },
+
+    disconnect() {
+      if (this.observer) {
+        this.observer.disconnect();
+        this.pendingNodes.clear();
+      }
+    }
+  };
+
+  // --- スロットリング/デバウンスユーティリティ ---
+  function throttle(func, wait) {
+    let timeout = null;
+    let previous = 0;
+    return function(...args) {
+      const now = Date.now();
+      const remaining = wait - (now - previous);
+      if (remaining <= 0 || remaining > wait) {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+        previous = now;
+        func.apply(this, args);
+      } else if (!timeout) {
+        timeout = setTimeout(() => {
+          previous = Date.now();
+          timeout = null;
+          func.apply(this, args);
+        }, remaining);
+      }
+    };
+  }
+
+  function debounce(func, wait) {
+    let timeout = null;
+    return function(...args) {
+      const later = () => {
+        timeout = null;
+        func.apply(this, args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
 
   // --- 依存関係のチェック ---
   if (
@@ -328,41 +453,28 @@ const ignoreSelectors = [
     const text = textNode.nodeValue;
     if (!text || text.trim() === "" || text.length > 1000) {
       // 長すぎるテキストは処理しない
+      performanceMonitor.skippedNodes++;
       return;
     }
 
-    // サイト固有設定の取得（サイトルールの無視セレクタチェック）
-    let effectiveSettings = null;
-    try {
-      if (
-        window.ChronoClipSettings &&
-        typeof window.ChronoClipSettings.getEffectiveSettings === "function"
-      ) {
-        effectiveSettings = window.ChronoClipSettings.getEffectiveSettings(
-          window.location.hostname
-        );
-
-        // サイトルールで無視セレクタが指定されている場合、親要素をチェック
+    // サイト固有設定の取得（キャッシュ使用）
+    const effectiveSettings = getCachedEffectiveSettings();
+    
+    // サイトルールで無視セレクタが指定されている場合、親要素をチェック
+    if (
+      effectiveSettings?.siteRule?.enabled &&
+      effectiveSettings.siteRule.ignoreSelector
+    ) {
+      let parentElement = textNode.parentElement;
+      while (parentElement && parentElement !== document.body) {
         if (
-          effectiveSettings?.siteRule?.enabled &&
-          effectiveSettings.siteRule.ignoreSelector
+          parentElement.matches(effectiveSettings.siteRule.ignoreSelector)
         ) {
-          let parentElement = textNode.parentElement;
-          while (parentElement && parentElement !== document.body) {
-            if (
-              parentElement.matches(effectiveSettings.siteRule.ignoreSelector)
-            ) {
-              return; // 無視セレクタにマッチした場合は処理をスキップ
-            }
-            parentElement = parentElement.parentElement;
-          }
+          performanceMonitor.skippedNodes++;
+          return; // 無視セレクタにマッチした場合は処理をスキップ
         }
+        parentElement = parentElement.parentElement;
       }
-    } catch (error) {
-      console.warn(
-        "ChronoClip: Error getting effective settings in processTextNode:",
-        error
-      );
     }
 
     let lastIndex = 0;
@@ -1237,25 +1349,56 @@ const ignoreSelectors = [
     );
 
     const textNodesToProcess = [];
+    const lazyLoadNodes = [];
     let currentNode = treeWalker.nextNode();
     let nodeCount = 0;
 
+    // 定数の取得
+    const config = window.ChronoClipConfig?.PERFORMANCE || {};
+    const maxNodes = config.MAX_NODES || 1000;
+
     // 処理するノード数を制限（大きなページでの過負荷を防ぐ）
-    while (currentNode && nodeCount < 500) {
-      textNodesToProcess.push(currentNode);
+    while (currentNode && nodeCount < maxNodes) {
+      // ビューポート内かどうかチェック（パフォーマンス最適化）
+      const parent = currentNode.parentElement;
+      if (parent) {
+        const rect = parent.getBoundingClientRect();
+        const isInViewport = (
+          rect.top < window.innerHeight + 200 && // 200px下までを含める
+          rect.bottom > -200 && // 200px上までを含める
+          rect.left < window.innerWidth &&
+          rect.right > 0
+        );
+
+        if (isInViewport || nodeCount < 100) {
+          // 最初の100ノードまたはビューポート内は即座に処理
+          textNodesToProcess.push(currentNode);
+        } else {
+          // ビューポート外は遅延読み込み候補
+          lazyLoadNodes.push(currentNode);
+        }
+      } else {
+        textNodesToProcess.push(currentNode);
+      }
+      
       currentNode = treeWalker.nextNode();
       nodeCount++;
     }
 
-    if (nodeCount >= 500) {
+    if (nodeCount >= maxNodes) {
       console.warn(
-        "ChronoClip: Large page detected, limiting processing to 500 nodes"
+        `ChronoClip: Large page detected, limiting processing to ${maxNodes} nodes`
       );
     }
 
+    console.log(
+      `ChronoClip: Found ${textNodesToProcess.length} immediate nodes, ${lazyLoadNodes.length} lazy load nodes`
+    );
+
     // 収集したテキストノードを処理（バッチ処理で分割）
     let processedCount = 0;
-    const batchSize = 50;
+    const batchSize = config.BATCH_SIZE || 100;
+    const batchDelay = config.BATCH_DELAY_MS || 10;
 
     function processBatch() {
       const endIndex = Math.min(
@@ -1280,7 +1423,7 @@ const ignoreSelectors = [
 
       if (processedCount < textNodesToProcess.length) {
         // 次のバッチを非同期で処理（UIブロッキングを防ぐ）
-        setTimeout(processBatch, 10);
+        setTimeout(processBatch, batchDelay);
       } else {
         const endTime = performance.now();
         console.log(
@@ -1288,11 +1431,57 @@ const ignoreSelectors = [
             endTime - startTime
           ).toFixed(2)}ms`
         );
+        
+        // 遅延読み込みノードの設定
+        setupLazyLoading(lazyLoadNodes);
       }
     }
 
     // 最初のバッチを開始
     processBatch();
+  }
+
+  /**
+   * 遅延読み込みの設定
+   * @param {Array} nodes - 遅延読み込み対象のノード配列
+   */
+  function setupLazyLoading(nodes) {
+    if (nodes.length === 0) return;
+
+    // Intersection Observerの初期化
+    if (!lazyLoadManager.observer && !lazyLoadManager.init()) {
+      // Intersection Observerがサポートされていない場合は全て処理
+      console.warn('ChronoClip: Processing all nodes without lazy loading');
+      nodes.forEach(node => {
+        try {
+          processTextNode(node);
+          performanceMonitor.processedNodes++;
+        } catch (e) {
+          console.error('ChronoClip: Error processing lazy node:', e);
+        }
+      });
+      return;
+    }
+
+    console.log(`ChronoClip: Setting up lazy loading for ${nodes.length} nodes`);
+
+    // 各ノードの親要素を監視
+    const processedParents = new Set();
+    nodes.forEach(node => {
+      const parent = node.parentElement;
+      if (!parent || processedParents.has(parent)) return;
+      
+      processedParents.add(parent);
+      lazyLoadManager.observe(parent, () => {
+        // ビューポートに入ったら処理
+        try {
+          processTextNode(node);
+          performanceMonitor.processedNodes++;
+        } catch (e) {
+          console.error('ChronoClip: Error processing lazy loaded node:', e);
+        }
+      });
+    });
   }
 
   // メイン初期化関数
@@ -1370,7 +1559,10 @@ const ignoreSelectors = [
     pendingMutations.push(...significantMutations);
 
     // デバウンス処理：SPA変更は長めに待つ
-    const debounceTime = hasMajorChanges ? 1500 : 500;
+    const config = window.ChronoClipConfig?.PERFORMANCE || {};
+    const debounceTime = hasMajorChanges 
+      ? (config.MUTATION_DEBOUNCE_MAJOR_MS || 1500)
+      : (config.MUTATION_DEBOUNCE_MS || 500);
 
     if (mutationTimeout) {
       clearTimeout(mutationTimeout);
@@ -1393,73 +1585,100 @@ const ignoreSelectors = [
           findAndHighlightDates();
         }, 100);
       } else {
-        // 小さな変更の場合は部分的に処理
+        // 小さな変更の場合は部分的に処理（バッチ処理でDOM操作を削減）
+        const nodesToProcess = [];
+        
         pendingMutations.forEach((mutation) => {
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === Node.ELEMENT_NODE) {
               // 小さなノードは処理をスキップ
-              if (node.textContent && node.textContent.length < 20) return;
+              if (node.textContent && node.textContent.length < 20) {
+                performanceMonitor.skippedNodes++;
+                return;
+              }
 
               // 既に処理済みかチェック
-              if (node.querySelector(".chronoclip-date")) return;
-
-              // 追加された要素内のテキストノードを再走査
-              const treeWalker = document.createTreeWalker(
-                node,
-                NodeFilter.SHOW_TEXT,
-                {
-                  acceptNode: function (n) {
-                    // 既に処理済みの要素や無視リストに含まれる要素はスキップ
-                    let currentNode = n.parentNode;
-                    while (currentNode && currentNode !== node) {
-                      if (
-                        ignoreSelectors.some(
-                          (selector) =>
-                            currentNode.matches && currentNode.matches(selector)
-                        )
-                      ) {
-                        return NodeFilter.FILTER_REJECT;
-                      }
-                      currentNode = currentNode.parentNode;
-                    }
-                    if (
-                      !n.nodeValue ||
-                      n.nodeValue.trim() === "" ||
-                      n.nodeValue.length < 5
-                    ) {
-                      return NodeFilter.FILTER_REJECT;
-                    }
-                    return NodeFilter.FILTER_ACCEPT;
-                  },
-                },
-                false
-              );
-
-              let processedCount = 0;
-              let currentNode = treeWalker.nextNode();
-              while (currentNode && processedCount < 20) {
-                // SPAでは最大20ノードまで
-                try {
-                  processTextNode(currentNode);
-                  processedCount++;
-                } catch (e) {
-                  console.error(
-                    "ChronoClip: Error processing dynamically added node:",
-                    currentNode,
-                    e
-                  );
-                }
-                currentNode = treeWalker.nextNode();
+              if (node.querySelector(".chronoclip-date")) {
+                performanceMonitor.skippedNodes++;
+                return;
               }
+
+              nodesToProcess.push(node);
             }
           });
         });
+
+        // バッチでまとめて処理（DOM操作を削減）
+        processMutationBatch(nodesToProcess);
       }
 
       pendingMutations = [];
       mutationTimeout = null;
     }, debounceTime);
   });
+
+  /**
+   * 変更されたノードをバッチで処理
+   * @param {Array} nodes - 処理するノードの配列
+   */
+  function processMutationBatch(nodes) {
+    if (nodes.length === 0) return;
+
+    let totalProcessed = 0;
+    const maxNodesPerMutation = 20;
+
+    nodes.forEach(node => {
+      // 追加された要素内のテキストノードを再走査
+      const treeWalker = document.createTreeWalker(
+        node,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: function (n) {
+            // 既に処理済みの要素や無視リストに含まれる要素はスキップ
+            let currentNode = n.parentNode;
+            while (currentNode && currentNode !== node) {
+              if (
+                ignoreSelectors.some(
+                  (selector) =>
+                    currentNode.matches && currentNode.matches(selector)
+                )
+              ) {
+                return NodeFilter.FILTER_REJECT;
+              }
+              currentNode = currentNode.parentNode;
+            }
+            if (
+              !n.nodeValue ||
+              n.nodeValue.trim() === "" ||
+              n.nodeValue.length < 5
+            ) {
+              return NodeFilter.FILTER_REJECT;
+            }
+            return NodeFilter.FILTER_ACCEPT;
+          },
+        },
+        false
+      );
+
+      let processedCount = 0;
+      let currentNode = treeWalker.nextNode();
+      while (currentNode && processedCount < maxNodesPerMutation && totalProcessed < 100) {
+        // 全体で最大100ノードまで
+        try {
+          processTextNode(currentNode);
+          processedCount++;
+          totalProcessed++;
+        } catch (e) {
+          console.error(
+            "ChronoClip: Error processing dynamically added node:",
+            currentNode,
+            e
+          );
+        }
+        currentNode = treeWalker.nextNode();
+      }
+    });
+  }
 
   // body要素とその子孫の変更を監視
   observer.observe(document.body, { childList: true, subtree: true });

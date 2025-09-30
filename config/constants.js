@@ -40,14 +40,32 @@ window.ChronoClipConfig = {
     // MutationObserverのデバウンス時間（ミリ秒）
     MUTATION_DEBOUNCE_MS: 500,
 
+    // 大きな変更に対するデバウンス時間（ミリ秒）
+    MUTATION_DEBOUNCE_MAJOR_MS: 1500,
+
     // バッチ処理のサイズ
     BATCH_SIZE: 100,
 
     // 処理対象の最大ノード数
     MAX_NODES: 1000,
 
+    // バッチ処理間の待機時間（ミリ秒）
+    BATCH_DELAY_MS: 10,
+
     // パフォーマンス監視の間隔（ミリ秒）
     PERFORMANCE_CHECK_INTERVAL: 5000,
+
+    // Intersection Observerのルートマージン
+    INTERSECTION_ROOT_MARGIN: "100px",
+
+    // Intersection Observerの閾値
+    INTERSECTION_THRESHOLD: 0.01,
+
+    // 遅延処理するノードの最大数
+    MAX_LAZY_NODES: 100,
+
+    // スクロール時のスロットル時間（ミリ秒）
+    SCROLL_THROTTLE_MS: 300,
   },
 
   // 抽出関連の設定
