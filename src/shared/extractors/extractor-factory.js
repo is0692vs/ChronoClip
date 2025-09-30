@@ -50,6 +50,12 @@ class ExtractorFactory {
       window.ChronoClipStardomMonthExtractor
     );
 
+    // NJPW（新日本プロレス）スケジュールページ
+    this.extractors.set(
+      "njpw-schedule",
+      window.ChronoClipNjpwScheduleExtractor
+    );
+
     // 一般的なエンジン（フォールバック）
     this.extractors.set("general", window.ChronoClipGeneralExtractor);
   }
@@ -87,6 +93,11 @@ class ExtractorFactory {
         ExtractorClass = this.extractors.get("tokyo-dome-hall");
         console.log(
           `ChronoClip: Auto-detected tokyo-dome-hall extractor for ${domain}`
+        );
+      } else if (domain.includes("njpw.co.jp")) {
+        ExtractorClass = this.extractors.get("njpw-schedule");
+        console.log(
+          `ChronoClip: Auto-detected njpw-schedule extractor for ${domain}`
         );
       } else {
         ExtractorClass = this.extractors.get("general");
