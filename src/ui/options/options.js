@@ -221,6 +221,10 @@ function initializeElements() {
       "defaultCalendar",
       "default calendar select"
     ),
+    refreshCalendarsBtn: getElementSafe(
+      "refreshCalendarsBtn",
+      "refresh calendars button"
+    ),
     timezone: getElementSafe("timezone", "timezone select"),
     dateFormatsContainer: getElementSafe(
       "dateFormatsContainer",
@@ -563,6 +567,14 @@ function initializeEventListeners() {
 
   // リセットボタン
   addSafeEventListener("resetBtn", "click", handleReset, "reset button");
+
+  // カレンダー更新ボタン
+  addSafeEventListener(
+    "refreshCalendarsBtn",
+    "click",
+    handleRefreshCalendars,
+    "refresh calendars button"
+  );
 
   // サイトルール関連
   addSafeEventListener(
@@ -1188,6 +1200,56 @@ async function handleReset() {
       }
     }
   );
+}
+
+/**
+ * カレンダーリストを強制的に再取得
+ */
+async function handleRefreshCalendars() {
+  try {
+    // Disable button during refresh
+    if (elements.refreshCalendarsBtn) {
+      elements.refreshCalendarsBtn.disabled = true;
+      elements.refreshCalendarsBtn.textContent = "🔄";
+    }
+
+    console.log("ChronoClip: Forcing calendar list refresh...");
+    
+    // Clear cache by setting lastFetched to 0
+    currentSettings.calendarListLastFetched = 0;
+    
+    // Fetch fresh calendar list
+    const response = await chrome.runtime.sendMessage({
+      type: "getCalendarList"
+    });
+    
+    if (response && response.success && response.calendars) {
+      console.log("ChronoClip: Refreshed calendars:", response.calendars);
+      
+      // Update settings with new calendar list
+      currentSettings.calendarList = response.calendars;
+      currentSettings.calendarListLastFetched = Date.now();
+      
+      // Save to storage
+      await window.ChronoClipSettings.saveSettings(currentSettings);
+      
+      // Update dropdown
+      await updateCalendarDropdown();
+      
+      showToast("カレンダーリストを更新しました", "success");
+    } else {
+      throw new Error(response?.error || "Failed to fetch calendars");
+    }
+  } catch (error) {
+    console.error("ChronoClip: Failed to refresh calendars:", error);
+    showToast("カレンダーリストの更新に失敗しました", "error");
+  } finally {
+    // Re-enable button
+    if (elements.refreshCalendarsBtn) {
+      elements.refreshCalendarsBtn.disabled = false;
+      elements.refreshCalendarsBtn.textContent = "🔄";
+    }
+  }
 }
 
 /**
