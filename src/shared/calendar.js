@@ -22,6 +22,45 @@ function getAuthToken(interactive = true) {
 }
 
 /**
+ * Fetches the list of calendars from Google Calendar API.
+ *
+ * @returns {Promise<Array>} Array of calendar objects with id, summary, and other properties.
+ * @throws {Error} If fetching calendar list fails.
+ */
+async function getCalendarList() {
+  const token = await getAuthToken(true);
+  const apiUrl = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
+
+  const response = await fetch(apiUrl, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      // Token might be expired, try to refresh
+      const currentToken = await getAuthToken(false);
+      if (currentToken) {
+        await chrome.identity.removeCachedAuthToken({ token: currentToken });
+      }
+      // Retry with fresh token
+      return getCalendarList();
+    }
+
+    const errorData = await response.json();
+    const errorMessage =
+      errorData.error?.message || `HTTP error! status: ${response.status}`;
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  return data.items || [];
+}
+
+/**
  * Creates an event in Google Calendar.
  *
  * @param {object} params - The event details.

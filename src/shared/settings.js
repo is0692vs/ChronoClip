@@ -12,6 +12,8 @@ const DEFAULT_SETTINGS = {
   highlightDates: true, // ハイライト表示ON/OFF
   defaultDuration: 180, // デフォルトイベント時間（分）
   defaultCalendar: "primary", // 追加先カレンダーID
+  calendarList: [], // 利用可能なカレンダーリスト（キャッシュ）
+  calendarListLastFetched: null, // カレンダーリスト最終取得日時
   timezone: "Asia/Tokyo", // 既定タイムゾーン
   includeURL: true, // 抽出時にURLを説明へ付与
   dateFormats: ["JP", "ISO", "US"], // 対応日付形式の優先順位
