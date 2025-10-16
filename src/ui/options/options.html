@@ -136,6 +136,46 @@
           <!-- 略：サイトルール関連のHTML -->
         </section>
 
+        <!-- ドメイン除外リスト -->
+        <section class="setting-section">
+          <h2>ドメイン除外リスト</h2>
+          <p class="description">
+            ChronoClipを動作させないドメインやURLパターンを指定できます。
+            サイトルールよりもシンプルに、特定のサイトで拡張機能を無効化できます。
+          </p>
+
+          <div class="setting-item">
+            <label>除外パターン一覧</label>
+            <div id="excludedDomainsList" class="excluded-domains-list">
+              <!-- JavaScriptで動的生成 -->
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label for="newExcludedDomain">新しいパターンを追加</label>
+            <div class="input-with-button">
+              <input
+                type="text"
+                id="newExcludedDomain"
+                placeholder="例: example.com, *.google.com, facebook.com/ads/*"
+              />
+              <button
+                type="button"
+                id="addExcludedDomainBtn"
+                class="secondary-btn"
+              >
+                追加
+              </button>
+            </div>
+            <p class="description">
+              <strong>パターンの種類：</strong><br />
+              • <code>example.com</code> - 完全一致（そのドメインのみ）<br />
+              • <code>*.example.com</code> - サブドメイン一括（すべてのサブドメイン）<br />
+              • <code>example.com/admin/*</code> - URLパターン（特定のパスのみ）
+            </p>
+          </div>
+        </section>
+
         <!-- デバッグ・監視設定 -->
         <section class="setting-section">
           <h2>デバッグ・監視設定</h2>

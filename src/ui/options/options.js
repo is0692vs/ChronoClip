@@ -476,6 +476,24 @@ function initializeEventListeners() {
   // リセットボタン
   addSafeEventListener("resetBtn", "click", handleReset, "reset button");
 
+  // 除外ドメイン関連
+  addSafeEventListener(
+    "addExcludedDomainBtn",
+    "click",
+    addExcludedDomain,
+    "add excluded domain button"
+  );
+  // Enterキーでも追加できるように
+  const newExcludedDomainInput = document.getElementById("newExcludedDomain");
+  if (newExcludedDomainInput) {
+    newExcludedDomainInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addExcludedDomain();
+      }
+    });
+  }
+
   // サイトルール関連
   addSafeEventListener(
     "rulesEnabled",
@@ -662,6 +680,9 @@ function updateUI() {
 
   // サイトルールリスト
   updateSiteRulesUI();
+
+  // 除外ドメインリスト
+  updateExcludedDomainsUI();
 
   // ボタン状態
   isDirty = false;
@@ -1916,6 +1937,111 @@ function toggleCollapsibleSection(event) {
   const header = event.currentTarget;
   const section = header.closest(".collapsible");
   section.classList.toggle("collapsed");
+}
+
+/**
+ * 除外ドメインリストのUIを更新
+ */
+function updateExcludedDomainsUI() {
+  const container = document.getElementById("excludedDomainsList");
+  if (!container) {
+    console.warn("ChronoClip: excludedDomainsList container not found");
+    return;
+  }
+
+  const excludedDomains = currentSettings.excludedDomains || [];
+  
+  if (excludedDomains.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = excludedDomains
+    .map(
+      (pattern, index) => `
+    <div class="excluded-domain-item" data-index="${index}">
+      <span class="excluded-domain-pattern">${escapeHtml(pattern)}</span>
+      <button type="button" class="excluded-domain-remove" onclick="removeExcludedDomain(${index})">
+        削除
+      </button>
+    </div>
+  `
+    )
+    .join("");
+}
+
+/**
+ * 除外ドメインを追加
+ */
+async function addExcludedDomain() {
+  const input = document.getElementById("newExcludedDomain");
+  if (!input) return;
+
+  const pattern = input.value.trim();
+  if (!pattern) {
+    showToast("パターンを入力してください", "error");
+    return;
+  }
+
+  // 簡易バリデーション
+  if (pattern.length > 256) {
+    showToast("パターンは256文字以下にしてください", "error");
+    return;
+  }
+
+  // 初期化
+  if (!currentSettings.excludedDomains) {
+    currentSettings.excludedDomains = [];
+  }
+
+  // 重複チェック
+  if (currentSettings.excludedDomains.includes(pattern)) {
+    showToast("このパターンは既に追加されています", "warning");
+    return;
+  }
+
+  // 最大数チェック
+  if (currentSettings.excludedDomains.length >= 100) {
+    showToast("除外リストは最大100件までです", "error");
+    return;
+  }
+
+  // 追加
+  currentSettings.excludedDomains.push(pattern);
+  isDirty = true;
+  updateSaveButtonState();
+  updateExcludedDomainsUI();
+  
+  // 入力欄をクリア
+  input.value = "";
+  
+  showToast(`除外パターン「${pattern}」を追加しました`, "success");
+}
+
+/**
+ * 除外ドメインを削除
+ */
+function removeExcludedDomain(index) {
+  if (!currentSettings.excludedDomains || index < 0 || index >= currentSettings.excludedDomains.length) {
+    return;
+  }
+
+  const pattern = currentSettings.excludedDomains[index];
+  currentSettings.excludedDomains.splice(index, 1);
+  isDirty = true;
+  updateSaveButtonState();
+  updateExcludedDomainsUI();
+  
+  showToast(`除外パターン「${pattern}」を削除しました`, "success");
+}
+
+/**
+ * HTMLエスケープ
+ */
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 /**

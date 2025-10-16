@@ -893,3 +893,87 @@ textarea:focus {
   max-width: 60%;
   text-align: right;
 }
+
+/* Excluded Domains List */
+.excluded-domains-list {
+  background: #f8f9fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 100px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.excluded-domains-list:empty::before {
+  content: "除外リストは空です";
+  display: block;
+  text-align: center;
+  color: #999;
+  padding: 32px;
+  font-style: italic;
+}
+
+.excluded-domain-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: white;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.excluded-domain-item:hover {
+  border-color: #4285f4;
+  box-shadow: 0 1px 3px rgba(66, 133, 244, 0.1);
+}
+
+.excluded-domain-pattern {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 13px;
+  color: #333;
+  flex: 1;
+  word-break: break-all;
+}
+
+.excluded-domain-remove {
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-left: 12px;
+}
+
+.excluded-domain-remove:hover {
+  background: #c82333;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-button input[type="text"] {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.input-with-button input[type="text"]:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+}
+
+.input-with-button button {
+  white-space: nowrap;
+}
