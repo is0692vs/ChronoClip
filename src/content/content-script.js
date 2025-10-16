@@ -2554,6 +2554,10 @@ async function showMultipleEventsUI(shadowRoot, events, popupHost) {
 async function addSelectedEvents(shadowRoot, events, popupHost) {
   const { logger } = getLoggerAndErrorHandler();
   
+  // Constants for configuration
+  const RATE_LIMIT_DELAY_MS = 300; // Delay between API requests to avoid rate limiting
+  const AUTO_CLOSE_DELAY_MS = 2000; // Delay before auto-closing popup after completion
+  
   // Get selected events
   const selectedIndexes = [];
   const checkboxes = shadowRoot.querySelectorAll(".event-checkbox:checked");
@@ -2602,7 +2606,7 @@ async function addSelectedEvents(shadowRoot, events, popupHost) {
     
     try {
       // Create event payload
-      const eventPayload = createEventPayload(event);
+      const eventPayload = createEventPayloadFromEvent(event);
       
       // Send to background script
       const response = await chrome.runtime.sendMessage({
@@ -2627,7 +2631,7 @@ async function addSelectedEvents(shadowRoot, events, popupHost) {
     
     // Rate limiting: wait a bit between requests
     if (i < selectedIndexes.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
     }
   }
   
@@ -2653,15 +2657,18 @@ async function addSelectedEvents(shadowRoot, events, popupHost) {
   // Close popup after a delay
   setTimeout(() => {
     popupHost.remove();
-  }, 2000);
+  }, AUTO_CLOSE_DELAY_MS);
 }
 
 /**
  * Create calendar event payload from event object
- * @param {Object} event - Event object
- * @returns {Object} Calendar event payload
+ * @param {Object} event - Event object with startTime, endTime, title, description, location, url
+ * @returns {Object} Calendar event payload in Google Calendar API format
  */
-function createEventPayload(event) {
+function createEventPayloadFromEvent(event) {
+  const DEFAULT_EVENT_DURATION_HOURS = 3;
+  const DEFAULT_EVENT_DURATION_MS = DEFAULT_EVENT_DURATION_HOURS * 60 * 60 * 1000;
+  
   const payload = {
     summary: event.title || "Event",
     description: event.description || "",
@@ -2670,10 +2677,21 @@ function createEventPayload(event) {
   // Handle date/time
   if (event.startTime) {
     const startDate = new Date(event.startTime);
-    const endDate = event.endTime ? new Date(event.endTime) : new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+    const endDate = event.endTime 
+      ? new Date(event.endTime) 
+      : new Date(startDate.getTime() + DEFAULT_EVENT_DURATION_MS);
     
-    // Check if it's an all-day event (no specific time)
-    if (startDate.getHours() === 0 && startDate.getMinutes() === 0) {
+    // Check if it's an all-day event
+    // Use explicit isAllDay flag if available, otherwise check if both start and end times
+    // have no time component (not just checking for midnight as that could be a valid time)
+    const isAllDay = event.isAllDay || (
+      !event.endTime && 
+      startDate.getHours() === 0 && 
+      startDate.getMinutes() === 0 &&
+      startDate.getSeconds() === 0
+    );
+    
+    if (isAllDay) {
       // All-day event
       payload.start = { date: startDate.toISOString().split("T")[0] };
       payload.end = { date: endDate.toISOString().split("T")[0] };
