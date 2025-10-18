@@ -318,6 +318,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentSettings.defaultDuration / 60
     );
     const defaultDurationMinutes = currentSettings.defaultDuration % 60;
+    
+    // Find calendar name from calendar list
+    let calendarName = "プライマリカレンダー";
+    if (currentSettings.calendarList && currentSettings.calendarList.length > 0) {
+      const selectedCalendar = currentSettings.calendarList.find(
+        cal => cal.id === currentSettings.defaultCalendar
+      );
+      if (selectedCalendar) {
+        calendarName = selectedCalendar.summary || selectedCalendar.id;
+      }
+    }
 
     settingsInfo.innerHTML = `
       <strong>現在の設定:</strong><br>
@@ -325,6 +336,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       • ハイライト: ${highlightStatus}<br>
       • デフォルト時間: ${defaultDurationHours}時間${defaultDurationMinutes}分<br>
       • タイムゾーン: ${currentSettings.timezone}<br>
+      • カレンダー: ${calendarName}<br>
       <small><a href="#" id="open-options">設定を変更</a></small>
     `;
 

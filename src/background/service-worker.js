@@ -241,6 +241,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case "calendar:createEvent":
           return await handleAddToCalendar(message.payload);
+          
+        case "getCalendarList":
+          return await handleGetCalendarList();
 
         case "retry_failed_items":
           return await handleRetryFailedItems(message.items);
@@ -396,6 +399,36 @@ async function handleAuthStatus() {
       }
     });
   });
+}
+
+/**
+ * カレンダーリスト取得処理
+ */
+async function handleGetCalendarList() {
+  try {
+    logger?.startProcess("calendar_list_fetch");
+    
+    const calendars = await getCalendarList();
+    
+    logger?.endProcess("calendar_list_fetch", {
+      count: calendars.length,
+    });
+    
+    return { success: true, calendars };
+  } catch (error) {
+    logger?.error("Failed to fetch calendar list", {
+      error: error.message,
+    });
+    
+    const handled = errorHandler?.handleError(error, {
+      type: "calendar_list_fetch",
+    });
+    
+    return {
+      success: false,
+      error: handled?.userMessage?.message || "カレンダーリストの取得に失敗しました",
+    };
+  }
 }
 
 /**

@@ -959,6 +959,48 @@ const ignoreSelectors = [
       // 抽出されたイベント情報は新しい関数では使用不可
       // デフォルトポップアップでは抽出情報なしで表示
 
+      // カレンダーリストを読み込み
+      try {
+        const settings = await window.ChronoClipSettings?.getSettings();
+        const calendarSelect = shadowRoot.getElementById("event-calendar");
+        
+        if (calendarSelect && settings) {
+          // Clear existing options
+          calendarSelect.innerHTML = "";
+          
+          const calendars = settings.calendarList || [];
+          const defaultCalendar = settings.defaultCalendar || "primary";
+          
+          if (calendars.length > 0) {
+            calendars.forEach(calendar => {
+              const option = document.createElement("option");
+              option.value = calendar.id;
+              option.textContent = calendar.summary || calendar.id;
+              
+              if (calendar.primary) {
+                option.textContent += " (プライマリ)";
+              }
+              
+              if (calendar.id === defaultCalendar) {
+                option.selected = true;
+              }
+              
+              calendarSelect.appendChild(option);
+            });
+          } else {
+            // Fallback to primary calendar
+            const option = document.createElement("option");
+            option.value = "primary";
+            option.textContent = "プライマリカレンダー";
+            option.selected = true;
+            calendarSelect.appendChild(option);
+          }
+        }
+      } catch (error) {
+        console.error("ChronoClip: Failed to load calendar list:", error);
+        // Fallback: keep the default primary calendar option
+      }
+
       // ポップアップの位置を調整
       const popupElement = shadowRoot.querySelector(
         ".chronoclip-quick-add-popup"
@@ -2139,6 +2181,48 @@ async function showQuickAddPopupForExtractedData(
       endTimeInput.style.display = hasTime ? "block" : "none";
     }
 
+    // カレンダーリストを読み込み
+    try {
+      const settings = await window.ChronoClipSettings?.getSettings();
+      const calendarSelect = shadowRoot.getElementById("event-calendar");
+      
+      if (calendarSelect && settings) {
+        // Clear existing options
+        calendarSelect.innerHTML = "";
+        
+        const calendars = settings.calendarList || [];
+        const defaultCalendar = settings.defaultCalendar || "primary";
+        
+        if (calendars.length > 0) {
+          calendars.forEach(calendar => {
+            const option = document.createElement("option");
+            option.value = calendar.id;
+            option.textContent = calendar.summary || calendar.id;
+            
+            if (calendar.primary) {
+              option.textContent += " (プライマリ)";
+            }
+            
+            if (calendar.id === defaultCalendar) {
+              option.selected = true;
+            }
+            
+            calendarSelect.appendChild(option);
+          });
+        } else {
+          // Fallback to primary calendar
+          const option = document.createElement("option");
+          option.value = "primary";
+          option.textContent = "プライマリカレンダー";
+          option.selected = true;
+          calendarSelect.appendChild(option);
+        }
+      }
+    } catch (error) {
+      console.error("ChronoClip: Failed to load calendar list:", error);
+      // Fallback: keep the default primary calendar option
+    }
+
     // All Dayチェックボックスの変更で時間フィールドの表示/非表示を切り替え
     if (allDayCheckbox) {
       allDayCheckbox.addEventListener("change", () => {
@@ -2190,6 +2274,7 @@ async function showQuickAddPopupForExtractedData(
           const isAllDay = shadowRoot.getElementById("all-day").checked;
           const startTime = shadowRoot.getElementById("event-time").value;
           const endTime = shadowRoot.getElementById("event-end-time").value;
+          const calendarId = shadowRoot.getElementById("event-calendar")?.value || "primary";
 
           // バリデーション
           if (!date) {
@@ -2220,6 +2305,7 @@ async function showQuickAddPopupForExtractedData(
             isAllDay,
             startTime,
             endTime,
+            calendarId,
             eventDataUrl: eventData?.url,
           });
 
@@ -2231,6 +2317,7 @@ async function showQuickAddPopupForExtractedData(
               description: description,
               start: { date: date },
               end: { date: date },
+              calendarId: calendarId,
             };
           } else {
             if (!startTime) {
@@ -2274,6 +2361,7 @@ async function showQuickAddPopupForExtractedData(
                 dateTime: endDateTime,
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               },
+              calendarId: calendarId,
             };
           }
 

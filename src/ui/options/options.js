@@ -182,6 +182,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadSettings();
     initializeEventListeners();
     updateUI();
+    
+    // Fetch and populate calendar list
+    await updateCalendarDropdown();
 
     // 現在のタブ情報を取得（Chrome拡張機能の場合）
     if (typeof chrome !== "undefined" && chrome.tabs) {
@@ -218,6 +221,10 @@ function initializeElements() {
     defaultCalendar: getElementSafe(
       "defaultCalendar",
       "default calendar select"
+    ),
+    refreshCalendarsBtn: getElementSafe(
+      "refreshCalendarsBtn",
+      "refresh calendars button"
     ),
     timezone: getElementSafe("timezone", "timezone select"),
     dateFormatsContainer: getElementSafe(
@@ -400,6 +407,91 @@ async function loadSettings() {
 }
 
 /**
+ * カレンダーリストを取得して設定に保存
+ */
+async function fetchAndCacheCalendarList() {
+  try {
+    console.log("ChronoClip: Fetching calendar list...");
+    
+    // Check if we need to refresh the calendar list (cache for 1 hour)
+    const now = Date.now();
+    const lastFetched = currentSettings.calendarListLastFetched;
+    const oneHour = 60 * 60 * 1000;
+    
+    if (lastFetched && (now - lastFetched) < oneHour && currentSettings.calendarList.length > 0) {
+      console.log("ChronoClip: Using cached calendar list");
+      return currentSettings.calendarList;
+    }
+    
+    // Send message to background script to fetch calendars
+    const response = await chrome.runtime.sendMessage({
+      type: "getCalendarList"
+    });
+    
+    if (response && response.success && response.calendars) {
+      console.log("ChronoClip: Fetched calendars:", response.calendars);
+      
+      // Update settings with calendar list
+      currentSettings.calendarList = response.calendars;
+      currentSettings.calendarListLastFetched = now;
+      
+      // Save to storage
+      await window.ChronoClipSettings.saveSettings(currentSettings);
+      
+      return response.calendars;
+    } else {
+      console.error("ChronoClip: Failed to fetch calendars:", response?.error);
+      return currentSettings.calendarList || [];
+    }
+  } catch (error) {
+    console.error("ChronoClip: Error fetching calendar list:", error);
+    return currentSettings.calendarList || [];
+  }
+}
+
+/**
+ * カレンダードロップダウンを更新
+ */
+async function updateCalendarDropdown() {
+  if (!elements.defaultCalendar) {
+    console.warn("ChronoClip: Calendar dropdown element not found");
+    return;
+  }
+  
+  const calendars = await fetchAndCacheCalendarList();
+  
+  // Clear existing options
+  elements.defaultCalendar.innerHTML = "";
+  
+  if (calendars.length === 0) {
+    // Add primary calendar as fallback
+    const option = document.createElement("option");
+    option.value = "primary";
+    option.textContent = "プライマリカレンダー";
+    elements.defaultCalendar.appendChild(option);
+  } else {
+    // Add all calendars
+    calendars.forEach(calendar => {
+      const option = document.createElement("option");
+      option.value = calendar.id;
+      option.textContent = calendar.summary || calendar.id;
+      
+      // Add visual indicator for primary calendar
+      if (calendar.primary) {
+        option.textContent += " (プライマリ)";
+      }
+      
+      elements.defaultCalendar.appendChild(option);
+    });
+  }
+  
+  // Set the current value
+  if (currentSettings.defaultCalendar) {
+    elements.defaultCalendar.value = currentSettings.defaultCalendar;
+  }
+}
+
+/**
  * イベントリスナーを初期化
  */
 function initializeEventListeners() {
@@ -476,6 +568,14 @@ function initializeEventListeners() {
 
   // リセットボタン
   addSafeEventListener("resetBtn", "click", handleReset, "reset button");
+
+  // カレンダー更新ボタン
+  addSafeEventListener(
+    "refreshCalendarsBtn",
+    "click",
+    handleRefreshCalendars,
+    "refresh calendars button"
+  );
 
   // サイトルール関連
   addSafeEventListener(
@@ -1105,6 +1205,56 @@ async function handleReset() {
       }
     }
   );
+}
+
+/**
+ * カレンダーリストを強制的に再取得
+ */
+async function handleRefreshCalendars() {
+  try {
+    // Disable button during refresh
+    if (elements.refreshCalendarsBtn) {
+      elements.refreshCalendarsBtn.disabled = true;
+      elements.refreshCalendarsBtn.textContent = "🔄";
+    }
+
+    console.log("ChronoClip: Forcing calendar list refresh...");
+    
+    // Clear cache by setting lastFetched to 0
+    currentSettings.calendarListLastFetched = 0;
+    
+    // Fetch fresh calendar list
+    const response = await chrome.runtime.sendMessage({
+      type: "getCalendarList"
+    });
+    
+    if (response && response.success && response.calendars) {
+      console.log("ChronoClip: Refreshed calendars:", response.calendars);
+      
+      // Update settings with new calendar list
+      currentSettings.calendarList = response.calendars;
+      currentSettings.calendarListLastFetched = Date.now();
+      
+      // Save to storage
+      await window.ChronoClipSettings.saveSettings(currentSettings);
+      
+      // Update dropdown
+      await updateCalendarDropdown();
+      
+      showToast("カレンダーリストを更新しました", "success");
+    } else {
+      throw new Error(response?.error || "Failed to fetch calendars");
+    }
+  } catch (error) {
+    console.error("ChronoClip: Failed to refresh calendars:", error);
+    showToast("カレンダーリストの更新に失敗しました", "error");
+  } finally {
+    // Re-enable button
+    if (elements.refreshCalendarsBtn) {
+      elements.refreshCalendarsBtn.disabled = false;
+      elements.refreshCalendarsBtn.textContent = "🔄";
+    }
+  }
 }
 
 /**

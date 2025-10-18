@@ -88,13 +88,24 @@
 
           <div class="setting-item">
             <label for="defaultCalendar">追加先カレンダー</label>
-            <select
-              id="defaultCalendar"
-              name="defaultCalendar"
-              class="select-input"
-            >
-              <option value="primary">プライマリカレンダー</option>
-            </select>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <select
+                id="defaultCalendar"
+                name="defaultCalendar"
+                class="select-input"
+                style="flex: 1;"
+              >
+                <option value="primary">プライマリカレンダー</option>
+              </select>
+              <button
+                type="button"
+                id="refreshCalendarsBtn"
+                class="secondary-btn"
+                title="カレンダーリストを更新"
+              >
+                🔄
+              </button>
+            </div>
             <p class="description">イベントを追加するGoogleカレンダーを選択</p>
           </div>
 
