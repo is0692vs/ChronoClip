@@ -77,22 +77,73 @@ ChronoClip/
 ├── config/
 │   ├── constants.js              # 各種設定値
 │   └── site-patterns.js          # サイト固有の抽出パターン
+├── manifest.example.json         # 拡張機能のマニフェスト例
 ├── manifest.json                 # 拡張機能のマニフェスト
+├── README.md
+├── References/                   # 参照用HTMLファイル
+│   ├── stardom-schedule-details.html
+│   ├── stardom-schedule-month.html
+│   └── tokyo-dome-event-page.html
 ├── src/
+│   ├── assets/                   # アセットファイル
 │   ├── background/
 │   │   └── service-worker.js     # バックグラウンド処理
 │   ├── content/                  # Webページに挿入されるスクリプト
 │   │   ├── content-script.js
+│   │   ├── content.css
 │   │   ├── event-detector.js
-│   │   └── ...
+│   │   ├── extractor-api.js
+│   │   ├── extractor.js
+│   │   └── selection.js
 │   ├── shared/                   # 共有モジュール
 │   │   ├── calendar.js
+│   │   ├── chrono.min.js
 │   │   ├── date-parser.js
+│   │   ├── date-utils.js
+│   │   ├── error-handler.js
+│   │   ├── logger.js
+│   │   ├── regex-patterns.js
+│   │   ├── settings.js
+│   │   ├── site-rule-manager.js
 │   │   └── extractors/           # サイト別抽出ロジック
+│   │       ├── amazon-extractor.js
+│   │       ├── base-extractor.js
+│   │       ├── eventbrite-extractor.js
+│   │       ├── example-extractor.js
+│   │       ├── extractor-factory.js
+│   │       ├── general-extractor.js
+│   │       ├── stardom-detail-extractor.js
+│   │       ├── stardom-month-extractor.js
+│   │       └── tokyo-dome-hall-extractor.js
 │   └── ui/                       # UI関連ファイル
 │       ├── options/              # 設定ページ
-│       └── popup/                # ポップアップ
-└── README.md
+│       │   ├── options.css
+│       │   ├── options.html
+│       │   └── options.js
+│       ├── popup/                # ポップアップ
+│       │   ├── popup.css
+│       │   ├── popup.html
+│       │   └── popup.js
+│       ├── quick-add-popup.css
+│       └── quick-add-popup.html
+└── tests/                        # テストファイル
+    ├── date-detection.test.js
+    ├── date-extraction-test.js
+    ├── date-extraction.test.js
+    ├── date-parsing-test.html
+    ├── error-handling-test.html
+    ├── event-extraction-test.html
+    ├── event-extraction.test.js
+    ├── integrated-module-test.html
+    ├── README.md
+    ├── selection-test.html
+    ├── settings-integration-test.html
+    ├── simple-test.js
+    ├── site-rule-integration-test.html
+    ├── stardom-detail-test.html
+    ├── stardom-month-test.html
+    ├── test.html
+    └── tokyo-dome-hall-test.html
 ```
 
 ### サイト固有ルール（カスタム抽出器）の追加手順
@@ -103,111 +154,111 @@ ChronoClip/
 
 まず、サイト固有の抽出ロジックを記述するファイルを作成します。
 
-1.  `src/shared/extractors/example-extractor.js` をコピーし、`src/shared/extractors/` ディレクトリ内に `{サイト名}-extractor.js` という名前で新しいファイルを作成します。（例: `my-site-extractor.js`）
-2.  ファイル内のクラス名を、`ChronoClip{サイト名}Extractor` のように、サイトに合わせて変更します。（例: `ChronoClipMySiteExtractor`）
-3.  `BaseExtractor` を継承するようにクラス定義を変更します。これにより、基本的な抽出機能やヘルパーメソッドを利用できます。
+1. `src/shared/extractors/example-extractor.js` をコピーし、`src/shared/extractors/` ディレクトリ内に `{サイト名}-extractor.js` という名前で新しいファイルを作成します。（例: `my-site-extractor.js`）
+2. ファイル内のクラス名を、`ChronoClip{サイト名}Extractor` のように、サイトに合わせて変更します。（例: `ChronoClipMySiteExtractor`）
+3. `BaseExtractor` を継承するようにクラス定義を変更します。これにより、基本的な抽出機能やヘルパーメソッドを利用できます。
 
-    ```javascript
-    // 変更前
-    class ChronoClipMySiteExtractor {
-      // ...
-    }
+   ```javascript
+   // 変更前
+   class ChronoClipMySiteExtractor {
+     // ...
+   }
 
-    // 変更後
-    class ChronoClipMySiteExtractor extends window.ChronoClipBaseExtractor {
-      constructor(rule) {
-        super(rule); // 親クラスのコンストラクタを呼び出す
-        this.name = "MySiteExtractor";
-        this.version = "1.0.0";
-      }
-      // ...
-    }
-    ```
+   // 変更後
+   class ChronoClipMySiteExtractor extends window.ChronoClipBaseExtractor {
+     constructor(rule) {
+       super(rule); // 親クラスのコンストラクタを呼び出す
+       this.name = "MySiteExtractor";
+       this.version = "1.0.0";
+     }
+     // ...
+   }
+   ```
 
-4.  `extractAll` メソッドをオーバーライド（再定義）し、サイトの HTML 構造に合わせて、タイトル、日付、詳細情報などを抽出する具体的なロジックを実装します。多くの場合、`context.querySelector()` や `context.querySelectorAll()` を使って特定の CSS セレクタを持つ要素から情報を取得します。
+4. `extractAll` メソッドをオーバーライド（再定義）し、サイトの HTML 構造に合わせて、タイトル、日付、詳細情報などを抽出する具体的なロジックを実装します。多くの場合、`context.querySelector()` や `context.querySelectorAll()` を使って特定の CSS セレクタを持つ要素から情報を取得します。
 
-    ```javascript
-    async extractAll(context) {
-        // 親のextractAllを呼び出して基本的な情報を取得
-        const baseData = await super.extractAll(context);
+   ```javascript
+   async extractAll(context) {
+       // 親のextractAllを呼び出して基本的な情報を取得
+       const baseData = await super.extractAll(context);
 
-        // このサイト固有のロジックで情報を上書き・追加
-        const titleElement = context.querySelector('h1.event-title');
-        if (titleElement) {
-            baseData.title = this.cleanText(titleElement.textContent);
-        }
+       // このサイト固有のロジックで情報を上書き・追加
+       const titleElement = context.querySelector('h1.event-title');
+       if (titleElement) {
+           baseData.title = this.cleanText(titleElement.textContent);
+       }
 
-        // 抽出の信頼度を更新
-        baseData.confidence = this.calculateConfidence(Object.values(baseData));
+       // 抽出の信頼度を更新
+       baseData.confidence = this.calculateConfidence(Object.values(baseData));
 
-        return baseData;
-    }
-    ```
+       return baseData;
+   }
+   ```
 
 #### 2. URL パターンと抽出器を紐付ける
 
 次に、どの URL で新しい抽出器を有効にするかを設定します。
 
-1.  `config/site-patterns.js` ファイルを開きます。
-2.  `window.ChronoClipSitePatterns` オブジェクトの末尾に、新しいサイトの設定を追加します。`extractorModule` には、次のステップで Factory に登録する際の一意なキー（通常はサイト名）を指定します。
+1. `config/site-patterns.js` ファイルを開きます。
+2. `window.ChronoClipSitePatterns` オブジェクトの末尾に、新しいサイトの設定を追加します。`extractorModule` には、次のステップで Factory に登録する際の一意なキー（通常はサイト名）を指定します。
 
-    ```javascript
-    window.ChronoClipSitePatterns = {
-      // ... 既存のルール
-      "my-site": {
-        // サイトの一意なキー
-        domains: ["www.my-site.com", "event.my-site.com"], // 対象ドメイン
-        priority: 10, // 優先度（高いほど優先される）
-        extractorModule: "my-site", // 抽出器のキー
-        selectors: {
-          // BaseExtractorが使用するセレクタ
-          title: "h1.event-title, .main-title",
-          date: ".date-info, .schedule",
-          // ... その他必要なセレクタ
-        },
-      },
-      // ... generalルールは最後に
-    };
-    ```
+   ```javascript
+   window.ChronoClipSitePatterns = {
+     // ... 既存のルール
+     "my-site": {
+       // サイトの一意なキー
+       domains: ["www.my-site.com", "event.my-site.com"], // 対象ドメイン
+       priority: 10, // 優先度（高いほど優先される）
+       extractorModule: "my-site", // 抽出器のキー
+       selectors: {
+         // BaseExtractorが使用するセレクタ
+         title: "h1.event-title, .main-title",
+         date: ".date-info, .schedule",
+         // ... その他必要なセレクタ
+       },
+     },
+     // ... generalルールは最後に
+   };
+   ```
 
 #### 3. 抽出器を Factory に登録する
 
 作成した抽出器を、アプリケーションが認識できるように登録します。
 
-1.  `src/shared/extractors/extractor-factory.js` を開きます。
-2.  `registerExtractors` メソッド内に、新しい抽出器を登録するコードを追加します。キーは `site-patterns.js` で指定したものと一致させます。
+1. `src/shared/extractors/extractor-factory.js` を開きます。
+2. `registerExtractors` メソッド内に、新しい抽出器を登録するコードを追加します。キーは `site-patterns.js` で指定したものと一致させます。
 
-    ```javascript
-    registerExtractors() {
-      // ... 既存のExtractor
-      this.extractors.set('my-site', window.ChronoClipMySiteExtractor);
-      // ...
-    }
-    ```
+   ```javascript
+   registerExtractors() {
+     // ... 既存のExtractor
+     this.extractors.set('my-site', window.ChronoClipMySiteExtractor);
+     // ...
+   }
+   ```
 
 #### 4. `manifest.json` を更新する
 
 最後に、作成した抽出器の JavaScript ファイルを Chrome 拡張機能に読み込ませるための設定を行います。
 
-1.  `manifest.json` （または `manifest.example.json`）を開きます。
-2.  `web_accessible_resources` セクションの `resources` 配列に、作成した抽出器ファイルへのパスを追加します。これにより、ウェブページからスクリプトにアクセスできるようになります。
+1. `manifest.json` （または `manifest.example.json`）を開きます。
+2. `web_accessible_resources` セクションの `resources` 配列に、作成した抽出器ファイルへのパスを追加します。これにより、ウェブページからスクリプトにアクセスできるようになります。
 
-    ```json
-    "web_accessible_resources": [
-      {
-        "resources": [
-          // ...
-          "src/shared/extractors/my-site-extractor.js"
-        ],
-        "matches": ["<all_urls>"]
-      }
-    ]
-    ```
+   ```json
+   "web_accessible_resources": [
+     {
+       "resources": [
+         // ...
+         "src/shared/extractors/my-site-extractor.js"
+       ],
+       "matches": ["<all_urls>"]
+     }
+   ]
+   ```
 
 #### 5. 動作確認
 
-1.  Chrome で `chrome://extensions` を開きます。
-2.  ChronoClip 拡張機能の「リロード」ボタンをクリックして、変更を反映させます。
-3.  設定した対象サイトのページを開き、日付などが正しくハイライトされたり、ポップアップに情報が自動入力されたりすることを確認します。
+1. Chrome で `chrome://extensions` を開きます。
+2. ChronoClip 拡張機能の「リロード」ボタンをクリックして、変更を反映させます。
+3. 設定した対象サイトのページを開き、日付などが正しくハイライトされたり、ポップアップに情報が自動入力されたりすることを確認します。
 
 もし問題が発生した場合は、デベロッパーコンソール（`F12`キー）で `ChronoClip:` から始まるログメッセージを確認すると、デバッグの助けになります。
