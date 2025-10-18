@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   version: 1,
   autoDetect: true, // 常時スキャン（自動検出）ON/OFF
   highlightDates: true, // ハイライト表示ON/OFF
+  highlightColor: "#ffeb3b", // ハイライトの背景色
   defaultDuration: 180, // デフォルトイベント時間（分）
   defaultCalendar: "primary", // 追加先カレンダーID
   timezone: "Asia/Tokyo", // 既定タイムゾーン
@@ -252,6 +253,17 @@ class SettingsManager {
       result.addError("highlightDates", "真偽値である必要があります");
     }
 
+    // highlightColor
+    if (
+      typeof settings.highlightColor !== "string" ||
+      !this.isValidColor(settings.highlightColor)
+    ) {
+      result.addError(
+        "highlightColor",
+        "有効な16進数カラーコード（例: #ffeb3b）を指定してください"
+      );
+    }
+
     // defaultDuration（分）
     if (
       typeof settings.defaultDuration !== "number" ||
@@ -381,6 +393,18 @@ class SettingsManager {
       /^[A-Za-z]+\/[A-Za-z_]+$/.test(timezone) ||
       timezone === "UTC"
     );
+  }
+
+  /**
+   * カラーコードの検証
+   * @param {string} color カラーコード文字列
+   * @returns {boolean} 有効性
+   */
+  isValidColor(color) {
+    if (typeof color !== "string") return false;
+
+    // 16進数カラーコード（#XXX または #XXXXXX）
+    return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(color);
   }
 
   /**
