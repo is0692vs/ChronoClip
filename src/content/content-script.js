@@ -1555,6 +1555,25 @@ const ignoreSelectors = [
       await initializeSettings();
       isInitialized = true;
 
+      // 除外ドメインチェック - 除外される場合は処理をスキップ
+      const currentDomain = window.location.hostname;
+      const currentUrl = window.location.href;
+      
+      if (window.ChronoClipSiteRuleManager) {
+        const siteRuleManager = window.ChronoClipSiteRuleManager.getSiteRuleManager();
+        await siteRuleManager.initialize();
+        
+        const isExcluded = await siteRuleManager.isExcluded(currentDomain, currentUrl);
+        if (isExcluded) {
+          logger?.info("Content script: Domain is excluded, skipping initialization", {
+            domain: currentDomain,
+            url: currentUrl,
+          });
+          console.log(`ChronoClip: ⛔ Domain ${currentDomain} is excluded, content script will not run`);
+          return; // 除外されている場合は処理を完全にスキップ
+        }
+      }
+
       // autoDetect設定が有効な場合のみ日付検出を開始
       if (currentSettings.autoDetect) {
         // DOMContentLoadedイベントを待ってから処理を開始

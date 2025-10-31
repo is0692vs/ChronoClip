@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   dateFormats: ["JP", "ISO", "US"], // 対応日付形式の優先順位
   rulesEnabled: false, // サイト別ルールの有効無効
   siteRules: {}, // サイト別ルール設定
+  excludedDomains: [], // 処理を実行しないドメイン・URLパターンのリスト
 
   // エラーハンドリングとログ関連設定（新規追加）
   debugMode: false, // デバッグモード（詳細ログ表示）
@@ -374,6 +375,34 @@ class SettingsManager {
           );
         }
       });
+    }
+
+    // excludedDomains
+    if (!Array.isArray(settings.excludedDomains)) {
+      result.addError("excludedDomains", "配列である必要があります");
+    } else {
+      // 各除外ドメインの検証
+      settings.excludedDomains.forEach((domain, index) => {
+        if (typeof domain !== "string" || domain.trim() === "") {
+          result.addError(
+            `excludedDomains[${index}]`,
+            "空でない文字列である必要があります"
+          );
+        }
+        if (domain.length > 256) {
+          result.addError(
+            `excludedDomains[${index}]`,
+            "ドメインまたはパターンは256文字以下である必要があります"
+          );
+        }
+      });
+      // 除外ドメインリストのサイズ制限（100個まで）
+      if (settings.excludedDomains.length > 100) {
+        result.addError(
+          "excludedDomains",
+          "除外ドメインリストは100個以下である必要があります"
+        );
+      }
     }
 
     return result;

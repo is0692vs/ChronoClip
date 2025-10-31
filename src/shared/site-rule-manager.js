@@ -243,6 +243,68 @@ class SiteRuleManager {
   }
 
   /**
+   * ドメインまたはURLが除外リストに含まれるかチェック
+   * @param {string} domain - ドメイン名
+   * @param {string} [url] - チェック対象のURL
+   * @returns {Promise<boolean>} 除外される場合はtrue
+   */
+  async isExcluded(domain, url = null) {
+    try {
+      const settings = await window.ChronoClipSettings.getSettings();
+      const excludedDomains = settings.excludedDomains || [];
+      
+      if (excludedDomains.length === 0) {
+        return false;
+      }
+
+      const normalizedDomain = this.normalizeDomain(domain);
+      const currentUrl = url || (typeof window !== "undefined" ? window.location.href : "");
+
+      for (const excludedPattern of excludedDomains) {
+        const normalizedPattern = excludedPattern.toLowerCase().trim();
+        
+        // 完全一致チェック
+        if (normalizedDomain === normalizedPattern) {
+          console.log(`ChronoClip: Domain ${domain} is excluded (exact match)`);
+          return true;
+        }
+
+        // サブドメインチェック（*.example.com形式）
+        if (normalizedPattern.startsWith("*.")) {
+          const baseDomain = normalizedPattern.substring(2);
+          if (normalizedDomain === baseDomain || normalizedDomain.endsWith("." + baseDomain)) {
+            console.log(`ChronoClip: Domain ${domain} is excluded (subdomain match: ${excludedPattern})`);
+            return true;
+          }
+        }
+
+        // URLパターンマッチング（正規表現として解釈）
+        if (currentUrl && (normalizedPattern.includes("/") || normalizedPattern.includes("*"))) {
+          try {
+            // パターンを正規表現に変換（簡易版）
+            const regexPattern = normalizedPattern
+              .replace(/\./g, "\\.") // . をエスケープ
+              .replace(/\*/g, ".*"); // * を .* に変換
+            const regex = new RegExp(regexPattern, "i");
+            
+            if (regex.test(currentUrl)) {
+              console.log(`ChronoClip: URL ${currentUrl} is excluded (pattern match: ${excludedPattern})`);
+              return true;
+            }
+          } catch (error) {
+            console.warn(`ChronoClip: Invalid exclusion pattern: ${excludedPattern}`, error);
+          }
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.warn("ChronoClip: Failed to check excluded domains:", error);
+      return false; // エラー時はフェイルセーフで処理を続行
+    }
+  }
+
+  /**
    * ドメインのルールを取得（URLパターンを考慮）
    * @param {string} domain - ドメイン名
    * @param {string} [url] - 現在のURL（パターンマッチング用）

@@ -142,6 +142,16 @@ class ExtractorFactory {
       const currentUrl =
         (context.ownerDocument || document).location?.href ||
         window.location.href;
+
+      // 除外リストチェック - 除外される場合は早期リターン
+      const isExcluded = await siteRuleManager.isExcluded(domain, currentUrl);
+      if (isExcluded) {
+        console.log(
+          `ChronoClip: ⛔ Domain ${domain} is in exclusion list, skipping extraction`
+        );
+        return null;
+      }
+
       const rule = siteRuleManager.getRuleForDomain(domain, currentUrl);
 
       if (!rule) {
