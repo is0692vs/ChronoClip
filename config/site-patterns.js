@@ -232,6 +232,38 @@ window.ChronoClipSitePatterns = {
     },
   },
 
+  // NJPW（新日本プロレス）
+  njpw: {
+    domains: ["www.njpw.co.jp", "njpw.co.jp"],
+    selectors: {
+      title: [
+        "h2",
+        "h3",
+        ".title",
+        ".event-title",
+        ".card-title",
+        ".schedule-title",
+      ],
+      date: [
+        ".date",
+        ".event-date",
+        ".schedule-date",
+        "time",
+        "[datetime]",
+        ".card-date",
+      ],
+      description: [".description", ".event-description", ".content"],
+      location: [".venue", ".location", ".event-venue", ".place", ".arena"],
+    },
+    dateFormats: ["YYYY年MM月DD日", "YYYY/MM/DD", "MM月DD日"],
+    priority: 9,
+    extraction: {
+      dateStrategy: "site-specific",
+      titleStrategy: "site-specific",
+      descriptionStrategy: "site-specific",
+    },
+  },
+
   // 一般的なサイト（フォールバック）
   general: {
     domains: ["*"],

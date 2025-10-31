@@ -38,6 +38,7 @@
         "src/shared/extractors/tokyo-dome-hall-extractor.js",
         "src/shared/extractors/stardom-detail-extractor.js",
         "src/shared/extractors/stardom-month-extractor.js",
+        "src/shared/extractors/njpw-schedule-extractor.js",
         "src/shared/extractors/general-extractor.js",
         "src/shared/extractors/extractor-factory.js",
         "src/shared/regex-patterns.js",

@@ -40,6 +40,21 @@ ChronoClip は、ウェブサイト上の日付やイベント情報を自動的
 
 カレンダーに追加したい情報（日付、イベント名など）を含むテキストを選択し、右クリックメニューから「Add to Calendar」を選択します。
 
+### 3. 対応サイト
+
+ChronoClip は以下のサイトに対して最適化された専用の抽出エンジンを持っています：
+
+- **Eventbrite** (eventbrite.com, eventbrite.co.jp) - イベント情報
+- **Amazon** (amazon.co.jp, amazon.com) - 配送日情報
+- **楽天** (rakuten.co.jp) - 配送・イベント日情報
+- **ぴあ** (pia.jp, t.pia.jp) - イベント情報
+- **Connpass** (connpass.com) - 技術イベント情報
+- **東京ドームシティホール** (tokyo-dome.co.jp/hall) - イベントカレンダー
+- **STARDOM** (wwr-stardom.com) - プロレス興行情報
+- **新日本プロレス (NJPW)** (njpw.co.jp) - プロレス興行スケジュール
+
+上記以外のサイトでも一般的な抽出エンジンが動作し、日付やイベント情報を検出できます。
+
 ## 🛠️ 開発者向け情報
 
 ### 開発環境のセットアップ
