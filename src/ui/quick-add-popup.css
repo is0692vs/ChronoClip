@@ -140,6 +140,145 @@
   background-color: #5a6268;
 }
 
+/* Multiple events section */
+.chronoclip-quick-add-popup .multiple-events-section {
+  display: block;
+}
+
+.chronoclip-quick-add-popup .multiple-events-section.hidden {
+  display: none;
+}
+
+.chronoclip-quick-add-popup .events-list-header {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.chronoclip-quick-add-popup .events-list-header label {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+}
+
+.chronoclip-quick-add-popup .events-list-header input[type="checkbox"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.chronoclip-quick-add-popup .events-count {
+  font-size: 0.9em;
+  color: #666;
+}
+
+.chronoclip-quick-add-popup .events-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.chronoclip-quick-add-popup .event-item {
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background-color: #fafafa;
+  transition: background-color 0.2s;
+}
+
+.chronoclip-quick-add-popup .event-item:hover {
+  background-color: #f0f0f0;
+}
+
+.chronoclip-quick-add-popup .event-item label {
+  display: flex;
+  align-items: flex-start;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+.chronoclip-quick-add-popup .event-item input[type="checkbox"] {
+  margin-right: 10px;
+  margin-top: 3px;
+  cursor: pointer;
+}
+
+.chronoclip-quick-add-popup .event-item-content {
+  flex: 1;
+}
+
+.chronoclip-quick-add-popup .event-item-title {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.chronoclip-quick-add-popup .event-item-date {
+  font-size: 0.85em;
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.chronoclip-quick-add-popup .event-item-location {
+  font-size: 0.8em;
+  color: #888;
+}
+
+.chronoclip-quick-add-popup .add-selected-button {
+  background-color: #28a745;
+  color: white;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s ease;
+}
+
+.chronoclip-quick-add-popup .add-selected-button:hover {
+  background-color: #218838;
+}
+
+.chronoclip-quick-add-popup .add-selected-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Progress section */
+.chronoclip-quick-add-popup .progress-section {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+}
+
+.chronoclip-quick-add-popup .progress-section.hidden {
+  display: none;
+}
+
+.chronoclip-quick-add-popup .progress-bar {
+  width: 100%;
+  height: 20px;
+  background-color: #e9ecef;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.chronoclip-quick-add-popup .progress-fill {
+  height: 100%;
+  background-color: #007bff;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.chronoclip-quick-add-popup .progress-text {
+  text-align: center;
+  font-size: 0.85em;
+  color: #666;
+}
+
 /* Responsive adjustments */
 @media (max-width: 600px) {
   .chronoclip-quick-add-popup {

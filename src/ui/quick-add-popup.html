@@ -11,6 +11,29 @@
         <h3>Add Event to Calendar</h3>
         <button class="close-button">&times;</button>
       </div>
+      
+      <!-- Multiple events selection -->
+      <div class="multiple-events-section hidden">
+        <div class="events-list-header">
+          <label>
+            <input type="checkbox" id="select-all-events" />
+            <span class="events-count"></span>
+          </label>
+        </div>
+        <div class="events-list"></div>
+        <div class="button-group">
+          <button type="button" class="add-selected-button">Add Selected</button>
+          <button type="button" class="cancel-button">Cancel</button>
+        </div>
+        <div class="progress-section hidden">
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+          <div class="progress-text"></div>
+        </div>
+      </div>
+
+      <!-- Single event form -->
       <form class="popup-form">
         <div class="form-group">
           <label for="event-date">Date:</label>

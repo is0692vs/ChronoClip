@@ -2075,6 +2075,7 @@ async function showQuickAddPopupWithData(extractedData) {
           description: description,
           url: eventSpecificUrl,
           source: extractedData.source,
+          events: extractedData.events, // Pass multiple events if available
         },
         {
           clientX: rect.left + rect.width / 2,
@@ -2189,6 +2190,21 @@ async function showQuickAddPopupForExtractedData(
     const style = document.createElement("style");
     style.textContent = cssText;
     shadowRoot.appendChild(style);
+
+    // Check if we have multiple events
+    const multipleEventsSection = shadowRoot.querySelector(".multiple-events-section");
+    const singleEventForm = shadowRoot.querySelector(".popup-form");
+    
+    if (eventData.events && eventData.events.length > 1) {
+      // Show multiple events UI
+      await showMultipleEventsUI(shadowRoot, eventData.events, popupHost);
+      return;
+    }
+
+    // Hide multiple events section for single event
+    if (multipleEventsSection) {
+      multipleEventsSection.classList.add("hidden");
+    }
 
     // フォームに抽出データを設定
     const titleInput = shadowRoot.getElementById("event-title");
@@ -2706,6 +2722,313 @@ async function showQuickAddPopupForExtractedData(
         "ポップアップの表示でエラーが発生しました"
     );
   }
+}
+
+/**
+ * Show UI for selecting and adding multiple events
+ * @param {ShadowRoot} shadowRoot - Shadow DOM root
+ * @param {Array} events - Array of event objects
+ * @param {HTMLElement} popupHost - Popup host element
+ */
+async function showMultipleEventsUI(shadowRoot, events, popupHost) {
+  const { logger } = getLoggerAndErrorHandler();
+  
+  logger?.info("Showing multiple events UI", { eventCount: events.length });
+  
+  // Hide the single event form
+  const singleEventForm = shadowRoot.querySelector(".popup-form");
+  if (singleEventForm) {
+    singleEventForm.style.display = "none";
+  }
+  
+  // Show multiple events section
+  const multipleEventsSection = shadowRoot.querySelector(".multiple-events-section");
+  if (multipleEventsSection) {
+    multipleEventsSection.classList.remove("hidden");
+  }
+  
+  // Update events count
+  const eventsCount = shadowRoot.querySelector(".events-count");
+  if (eventsCount) {
+    eventsCount.textContent = `Select events to add (${events.length} found)`;
+  }
+  
+  // Populate events list
+  const eventsList = shadowRoot.querySelector(".events-list");
+  if (eventsList) {
+    eventsList.innerHTML = "";
+    
+    events.forEach((event, index) => {
+      const eventItem = document.createElement("div");
+      eventItem.className = "event-item";
+      
+      // Format date
+      let dateStr = "";
+      if (event.startTime) {
+        const date = new Date(event.startTime);
+        if (!isNaN(date.getTime())) {
+          dateStr = date.toLocaleString("ja-JP", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        }
+      }
+      
+      eventItem.innerHTML = `
+        <label>
+          <input type="checkbox" class="event-checkbox" data-index="${index}" checked />
+          <div class="event-item-content">
+            <div class="event-item-title">${event.title || "No title"}</div>
+            ${dateStr ? `<div class="event-item-date">${dateStr}</div>` : ""}
+            ${event.location ? `<div class="event-item-location">${event.location}</div>` : ""}
+          </div>
+        </label>
+      `;
+      
+      eventsList.appendChild(eventItem);
+    });
+  }
+  
+  // Setup select all checkbox
+  const selectAllCheckbox = shadowRoot.getElementById("select-all-events");
+  if (selectAllCheckbox) {
+    selectAllCheckbox.checked = true;
+    selectAllCheckbox.addEventListener("change", (e) => {
+      const checkboxes = shadowRoot.querySelectorAll(".event-checkbox");
+      checkboxes.forEach(cb => cb.checked = e.target.checked);
+      updateAddButtonState();
+    });
+  }
+  
+  // Update add button state based on selection
+  const updateAddButtonState = () => {
+    const checkedBoxes = shadowRoot.querySelectorAll(".event-checkbox:checked");
+    const addButton = shadowRoot.querySelector(".add-selected-button");
+    if (addButton) {
+      addButton.disabled = checkedBoxes.length === 0;
+      addButton.textContent = `Add Selected (${checkedBoxes.length})`;
+    }
+  };
+  
+  // Listen to individual checkbox changes
+  const checkboxes = shadowRoot.querySelectorAll(".event-checkbox");
+  checkboxes.forEach(cb => {
+    cb.addEventListener("change", updateAddButtonState);
+  });
+  
+  // Setup add selected button
+  const addSelectedButton = shadowRoot.querySelector(".add-selected-button");
+  if (addSelectedButton) {
+    addSelectedButton.addEventListener("click", async () => {
+      await addSelectedEvents(shadowRoot, events, popupHost);
+    });
+  }
+  
+  // Setup cancel button
+  const cancelButtons = shadowRoot.querySelectorAll(".cancel-button");
+  cancelButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      popupHost.remove();
+    });
+  });
+  
+  // Setup close button
+  const closeButton = shadowRoot.querySelector(".close-button");
+  if (closeButton) {
+    closeButton.addEventListener("click", () => {
+      popupHost.remove();
+    });
+  }
+  
+  // Escape key handler
+  const escapeHandler = (e) => {
+    if (e.key === "Escape") {
+      popupHost.remove();
+      document.removeEventListener("keydown", escapeHandler);
+    }
+  };
+  document.addEventListener("keydown", escapeHandler);
+}
+
+/**
+ * Add selected events to calendar with progress display
+ * @param {ShadowRoot} shadowRoot - Shadow DOM root
+ * @param {Array} events - Array of all events
+ * @param {HTMLElement} popupHost - Popup host element
+ */
+async function addSelectedEvents(shadowRoot, events, popupHost) {
+  const { logger } = getLoggerAndErrorHandler();
+  
+  // Constants for configuration
+  const RATE_LIMIT_DELAY_MS = 300; // Delay between API requests to avoid rate limiting
+  const AUTO_CLOSE_DELAY_MS = 2000; // Delay before auto-closing popup after completion
+  
+  // Get selected events
+  const selectedIndexes = [];
+  const checkboxes = shadowRoot.querySelectorAll(".event-checkbox:checked");
+  checkboxes.forEach(cb => {
+    selectedIndexes.push(parseInt(cb.dataset.index));
+  });
+  
+  if (selectedIndexes.length === 0) {
+    showToast("info", "イベントが選択されていません");
+    return;
+  }
+  
+  logger?.info("Adding selected events", { count: selectedIndexes.length });
+  
+  // Show progress section
+  const progressSection = shadowRoot.querySelector(".progress-section");
+  if (progressSection) {
+    progressSection.classList.remove("hidden");
+  }
+  
+  // Disable buttons during processing
+  const addButton = shadowRoot.querySelector(".add-selected-button");
+  const cancelButtons = shadowRoot.querySelectorAll(".cancel-button");
+  if (addButton) addButton.disabled = true;
+  cancelButtons.forEach(btn => btn.disabled = true);
+  
+  // Process events
+  const results = [];
+  const failedEvents = [];
+  
+  for (let i = 0; i < selectedIndexes.length; i++) {
+    const index = selectedIndexes[i];
+    const event = events[index];
+    
+    // Update progress
+    const progress = ((i + 1) / selectedIndexes.length) * 100;
+    const progressFill = shadowRoot.querySelector(".progress-fill");
+    const progressText = shadowRoot.querySelector(".progress-text");
+    
+    if (progressFill) {
+      progressFill.style.width = `${progress}%`;
+    }
+    if (progressText) {
+      progressText.textContent = `Processing ${i + 1} of ${selectedIndexes.length}...`;
+    }
+    
+    try {
+      // Create event payload
+      const eventPayload = createEventPayloadFromEvent(event);
+      
+      // Send to background script
+      const response = await chrome.runtime.sendMessage({
+        type: "calendar:createEvent",
+        payload: eventPayload,
+      });
+      
+      if (response && response.success) {
+        results.push({ success: true, event });
+        logger?.debug("Event added successfully", { index, title: event.title });
+      } else {
+        const error = new Error(response?.error || "Failed to add event");
+        results.push({ success: false, event, error });
+        failedEvents.push(event);
+        logger?.warn("Event add failed", { index, error: response?.error });
+      }
+    } catch (error) {
+      results.push({ success: false, event, error });
+      failedEvents.push(event);
+      logger?.error("Error adding event", { index, error });
+    }
+    
+    // Rate limiting: wait a bit between requests
+    if (i < selectedIndexes.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
+    }
+  }
+  
+  // Show results
+  const successCount = results.filter(r => r.success).length;
+  const failedCount = failedEvents.length;
+  
+  if (progressText) {
+    progressText.textContent = `Complete: ${successCount} succeeded, ${failedCount} failed`;
+  }
+  
+  logger?.info("Batch add completed", { successCount, failedCount });
+  
+  // Show toast notification
+  if (failedCount === 0) {
+    showToast("success", `${successCount}件のイベントを追加しました`);
+  } else if (successCount > 0) {
+    showToast("warn", `${successCount}件追加、${failedCount}件失敗しました`);
+  } else {
+    showToast("error", "イベントの追加に失敗しました");
+  }
+  
+  // Close popup after a delay
+  setTimeout(() => {
+    popupHost.remove();
+  }, AUTO_CLOSE_DELAY_MS);
+}
+
+/**
+ * Create calendar event payload from event object
+ * @param {Object} event - Event object with startTime, endTime, title, description, location, url
+ * @returns {Object} Calendar event payload in Google Calendar API format
+ */
+function createEventPayloadFromEvent(event) {
+  const DEFAULT_EVENT_DURATION_HOURS = 3;
+  const DEFAULT_EVENT_DURATION_MS = DEFAULT_EVENT_DURATION_HOURS * 60 * 60 * 1000;
+  
+  const payload = {
+    summary: event.title || "Event",
+    description: event.description || "",
+  };
+  
+  // Handle date/time
+  if (event.startTime) {
+    const startDate = new Date(event.startTime);
+    const endDate = event.endTime 
+      ? new Date(event.endTime) 
+      : new Date(startDate.getTime() + DEFAULT_EVENT_DURATION_MS);
+    
+    // Check if it's an all-day event
+    // Use explicit isAllDay flag if available, otherwise check if both start and end times
+    // have no time component (not just checking for midnight as that could be a valid time)
+    const isAllDay = event.isAllDay || (
+      !event.endTime && 
+      startDate.getHours() === 0 && 
+      startDate.getMinutes() === 0 &&
+      startDate.getSeconds() === 0
+    );
+    
+    if (isAllDay) {
+      // All-day event
+      payload.start = { date: startDate.toISOString().split("T")[0] };
+      payload.end = { date: endDate.toISOString().split("T")[0] };
+    } else {
+      // Timed event
+      payload.start = {
+        dateTime: startDate.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+      payload.end = {
+        dateTime: endDate.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+    }
+  }
+  
+  // Add location if available
+  if (event.location) {
+    payload.location = event.location;
+  }
+  
+  // Add URL if available
+  if (event.url && event.url !== window.location.href) {
+    payload.description = payload.description 
+      ? `${payload.description}\n\n${event.url}`
+      : event.url;
+  }
+  
+  return payload;
 }
 
 /**
