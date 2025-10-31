@@ -2372,9 +2372,17 @@ async function showQuickAddPopupForExtractedData(
     }
     if (timeInput) {
       timeInput.style.display = hasTime ? "block" : "none";
+      // 時刻が抽出されなかった場合は値をクリア
+      if (!hasTime) {
+        timeInput.value = "";
+      }
     }
     if (endTimeInput) {
       endTimeInput.style.display = hasTime ? "block" : "none";
+      // 時刻が抽出されなかった場合は値をクリア
+      if (!hasTime) {
+        endTimeInput.value = "";
+      }
     }
 
     // All Dayチェックボックスの変更で時間フィールドの表示/非表示を切り替え
