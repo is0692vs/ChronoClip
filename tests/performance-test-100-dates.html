@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoClip Performance Test - 100+ Dates</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .event {
+            background: white;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .event h3 {
+            margin-top: 0;
+            color: #2196F3;
+        }
+        .event-date {
+            font-weight: bold;
+            color: #FF5722;
+        }
+        .event-time {
+            color: #9C27B0;
+            font-weight: 500;
+        }
+        .stats {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: 2px solid #4CAF50;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 10000;
+            min-width: 250px;
+        }
+        .stats h4 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        .stats p {
+            margin: 8px 0;
+        }
+        .stats span {
+            font-weight: bold;
+            color: #2196F3;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .success-indicator {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .warning-indicator {
+            color: #FF9800;
+            font-weight: bold;
+        }
+        .viewport-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(33, 150, 243, 0.9);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 10000;
+        }
+    </style>
+</head>
+<body>
+    <div class="stats">
+        <h4>📊 Performance Test</h4>
+        <p>Total dates: <span id="date-count">0</span></p>
+        <p>Page load: <span id="load-time">-</span></p>
+        <p>Status: <span id="status">Loading...</span></p>
+    </div>
+
+    <div class="viewport-indicator" id="scroll-indicator">
+        Scroll: 0%
+    </div>
+
+    <h1>🚀 ChronoClip パフォーマンステスト - 100+件の日付</h1>
+    
+    <div class="info-box">
+        <h3>📝 このテストについて</h3>
+        <p>このページには<strong>120個以上のイベント</strong>と<strong>600個以上の日付/時刻表現</strong>が含まれています。</p>
+        <p>ChronoClipの以下のパフォーマンス最適化機能をテストします：</p>
+        <ul>
+            <li>✅ 遅延読み込み (Lazy Loading with Intersection Observer)</li>
+            <li>✅ デバウンス/スロットリング</li>
+            <li>✅ 不要なDOM操作の削減</li>
+            <li>✅ パフォーマンスメトリクスの計測</li>
+        </ul>
+        <p><strong>期待される動作：</strong></p>
+        <ul>
+            <li>初期表示が100ms以内で完了すること</li>
+            <li>スクロールがスムーズであること（60FPS維持）</li>
+            <li>全ての日付が正しく検出されること</li>
+        </ul>
+    </div>
+
+    <div id="events-container"></div>
+
+    <div class="info-box" style="margin-top: 40px;">
+        <h3>🔍 検証方法</h3>
+        <ol>
+            <li>Chrome DevToolsのコンソールを開く</li>
+            <li>「ChronoClip: Date highlighting complete」のログを確認</li>
+            <li>処理時間とノード数を確認</li>
+            <li>ページをゆっくりスクロールして遅延読み込みを確認</li>
+            <li>コンソールで以下を実行してパフォーマンスメトリクスを確認:
+                <code style="display:block; background:#f5f5f5; padding:10px; margin:10px 0;">
+                    // 検出された日付要素数<br>
+                    document.querySelectorAll('.chronoclip-date').length
+                </code>
+            </li>
+        </ol>
+    </div>
+
+    <script>
+        const startTime = performance.now();
+        const container = document.getElementById('events-container');
+        
+        // イベントテンプレート
+        const eventTemplates = [
+            '定例会議',
+            'プロジェクトミーティング',
+            '新製品プレゼンテーション',
+            '社内研修',
+            '技術セミナー',
+            'ワークショップ',
+            'チームビルディングイベント',
+            '懇親会',
+            '新年会',
+            'カンファレンス',
+            'オンライン勉強会',
+            'コードレビュー会',
+            'スプリント計画',
+            'デモンストレーション',
+            '顧客ミーティング'
+        ];
+
+        const locations = [
+            '東京本社',
+            '大阪支社',
+            '会議室A',
+            'オンライン',
+            'カフェテリア',
+            '第1会議室',
+            '多目的ホール'
+        ];
+
+        const today = new Date();
+        let dateCount = 0;
+        let eventCount = 0;
+
+        // 120個のイベントを生成
+        for (let i = 0; i < 120; i++) {
+            const eventDate = new Date(today);
+            eventDate.setDate(today.getDate() + i);
+            
+            const year = eventDate.getFullYear();
+            const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+            const day = String(eventDate.getDate()).padStart(2, '0');
+            
+            // 様々な日付フォーマット
+            const dateStr1 = `${year}年${month}月${day}日`;
+            const dateStr2 = `${year}-${month}-${day}`;
+            const dateStr3 = `${year}/${month}/${day}`;
+            const dateStr4 = `${parseInt(month)}月${parseInt(day)}日`;
+            
+            const hour = 9 + (i % 10);
+            const minute = (i * 15) % 60;
+            const endHour = hour + 2;
+            const timeStr1 = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+            const timeStr2 = `${String(endHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+            
+            const eventName = eventTemplates[i % eventTemplates.length];
+            const location = locations[i % locations.length];
+            
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event';
+            eventDiv.innerHTML = `
+                <h3>${eventName} #${i + 1}</h3>
+                <p><span class="event-date">${dateStr1}</span> <span class="event-time">${timeStr1}</span> 開始</p>
+                <p>日付: ${dateStr2} または ${dateStr3} (${dateStr4})</p>
+                <p>時間: ${timeStr1}から${timeStr2}まで</p>
+                <p>場所: ${location}</p>
+                <p>相対日付: ${i === 0 ? '今日' : i === 1 ? '明日' : i === 7 ? '来週' : i === 30 ? '来月' : ''}</p>
+            `;
+            container.appendChild(eventDiv);
+            eventCount++;
+            
+            // 各イベントに約5個の日付/時刻が含まれる
+            dateCount += 5;
+        }
+
+        // 追加の日付パターンテスト
+        const additionalPatterns = [
+            {
+                title: '日本語相対日付パターン',
+                content: '今日、明日、昨日、来週、先週、今月末、来月、先月の予定があります。'
+            },
+            {
+                title: '和暦パターン',
+                content: '令和6年12月25日、平成31年4月1日、令和元年5月1日'
+            },
+            {
+                title: '様々な時刻パターン',
+                content: '09:00, 14:30, 18:45, 23:59, 00:00, 12:00'
+            },
+            {
+                title: '月日のみのパターン',
+                content: '12月25日、1月1日、3月15日、8月6日、11月23日'
+            },
+            {
+                title: '複数の日付形式',
+                content: '2024年12月25日、2024/12/31、2024-01-01、2025年1月1日'
+            }
+        ];
+
+        additionalPatterns.forEach((pattern, index) => {
+            const div = document.createElement('div');
+            div.className = 'event';
+            div.innerHTML = `
+                <h3>${pattern.title}</h3>
+                <p>${pattern.content}</p>
+            `;
+            container.appendChild(div);
+            dateCount += 5; // 概算
+        });
+
+        document.getElementById('date-count').textContent = `${dateCount}+ (generated)`;
+        document.getElementById('status').textContent = 'DOM Ready';
+
+        // スクロールインジケーター
+        let scrollTimeout;
+        window.addEventListener('scroll', () => {
+            clearTimeout(scrollTimeout);
+            const scrollPercent = Math.round((window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100);
+            document.getElementById('scroll-indicator').textContent = `Scroll: ${scrollPercent}%`;
+            
+            scrollTimeout = setTimeout(() => {
+                document.getElementById('scroll-indicator').style.opacity = '0.5';
+            }, 1000);
+        });
+
+        // ページロード時間を計測
+        window.addEventListener('load', () => {
+            const loadTime = performance.now() - startTime;
+            document.getElementById('load-time').textContent = `${loadTime.toFixed(2)}ms`;
+            document.getElementById('status').innerHTML = '<span class="success-indicator">✓ Loaded</span>';
+            
+            console.log(`%c=== ChronoClip Performance Test ===`, 'color: #4CAF50; font-weight: bold; font-size: 14px;');
+            console.log(`%cPage generated ${eventCount} events with ${dateCount}+ date expressions in ${loadTime.toFixed(2)}ms`, 'color: #2196F3;');
+            console.log(`%cExpected ChronoClip behavior:`, 'font-weight: bold;');
+            console.log('  1. Initial processing should complete within 100ms');
+            console.log('  2. Lazy loading should be active for out-of-viewport dates');
+            console.log('  3. Scroll should be smooth (60 FPS)');
+            console.log('  4. All dates should be detected and highlighted');
+            console.log(`%cTo check detected dates, run: document.querySelectorAll('.chronoclip-date').length`, 'color: #FF5722;');
+            
+            // 5秒後に検出された日付数を確認
+            setTimeout(() => {
+                const detectedDates = document.querySelectorAll('.chronoclip-date').length;
+                if (detectedDates > 0) {
+                    console.log(`%c✓ ChronoClip detected ${detectedDates} date elements`, 'color: #4CAF50; font-weight: bold;');
+                    document.getElementById('date-count').textContent = `${detectedDates} detected`;
+                    
+                    // パフォーマンスメトリクスを表示
+                    if (detectedDates >= 100) {
+                        console.log(`%c✓ Performance test PASSED: ${detectedDates} dates detected (>= 100)`, 'color: #4CAF50; font-weight: bold; font-size: 16px;');
+                        document.getElementById('status').innerHTML = '<span class="success-indicator">✓ Test PASSED</span>';
+                    } else {
+                        console.log(`%c⚠ Performance test WARNING: Only ${detectedDates} dates detected (expected >= 100)`, 'color: #FF9800; font-weight: bold;');
+                        document.getElementById('status').innerHTML = '<span class="warning-indicator">⚠ Low detection</span>';
+                    }
+                } else {
+                    console.log('%c✗ No dates detected by ChronoClip. Please check if the extension is enabled.', 'color: #F44336; font-weight: bold;');
+                    document.getElementById('status').innerHTML = '<span style="color: #F44336;">✗ Not detected</span>';
+                }
+            }, 5000);
+        });
+    </script>
+</body>
+</html>

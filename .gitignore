@@ -7,7 +7,11 @@ gha-creds-*.json
 # (ローカルでの開発にのみ使用し、公開しない)
 manifest.json
 
-tests/
+# 一般的なテストディレクトリは除外するが、
+# パフォーマンステストページは含める
+tests/*
+!tests/*.html
+!tests/*.md
 
 # その他、一般的な除外ファイル
 node_modules/
